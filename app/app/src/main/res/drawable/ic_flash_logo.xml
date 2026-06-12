@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28dp"
+    android:height="28dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <!-- rounded blue background -->
+    <path
+        android:fillColor="#185FA5"
+        android:pathData="M22,0 L74,0 A22,22 0 0 1 96,22 L96,74 A22,22 0 0 1 74,96 L22,96 A22,22 0 0 1 0,74 L0,22 A22,22 0 0 1 22,0 Z" />
+
+    <!-- lightning bolt -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M56,14 L30,46 L45,46 L38,66 L68,34 L52,34 Z" />
+
+    <!-- decorative speed lines -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.55"
+        android:pathData="M32,73 L64,73 A2,2 0 0 1 64,77 L32,77 A2,2 0 0 1 32,73 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.32"
+        android:pathData="M32,81 L50,81 A2,2 0 0 1 50,85 L32,85 A2,2 0 0 1 32,81 Z" />
+</vector>
