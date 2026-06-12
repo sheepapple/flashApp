@@ -37,4 +37,4 @@ async function fetchAndStore() {
   console.log('Done!')
 }
 
-fetchAndStore()
+fetchAndStore().catch(err => console.error('Fatal error:', err))
