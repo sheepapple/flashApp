@@ -19,8 +19,8 @@ The news, in a flash. A mobile news app where users scroll a feed of summary car
 | Mobile client | _(your app framework — e.g. Kotlin / Jetpack Compose)_ |
 | Backend API | _(your server — e.g. Node.js / Express)_ |
 | Database & Auth | [Supabase](https://supabase.com) — hosted PostgreSQL + built-in authentication + file storage |
-| News data | External news API _(undecided)_, cached in Postgres |
-| AI summaries | [Claude API](https://docs.claude.com) |
+| News data | [Guardian API](https://open-platform.theguardian.com/), cached in Postgres |
+| AI summaries | [Gemini API](https://ai.google.dev.)
 | Hosting (dev) | Render / Railway / Fly (backend + worker) |
 
 ### Why Postgres / Supabase
@@ -35,7 +35,7 @@ We handle two kinds of data: **article data** (the raw article info) and **relat
   (scheduled)    │  (cron / poller)  │               │  Supabase  │
                  └──────────────────┘   ┌──────────► │ (Postgres  │
                           │             │            │  + Auth)   │
-                   Claude API           │            └────────────┘
+                   Gemini API           │            └────────────┘
                   (summaries)           │                  ▲
                                         │                  │
    Mobile app ──(request + token)──► Backend API ──────────┘
@@ -43,7 +43,7 @@ We handle two kinds of data: **article data** (the raw article info) and **relat
                                    authenticated user)
 ```
 
-Key idea: the app **never** calls the news API directly. A background worker polls the news API on a schedule, generates summaries via the Claude API, and caches everything in Postgres. Users only ever read from our own database — so API call volume is fixed by the polling schedule, not by user traffic, which keeps us under rate limits.
+Key idea: the app **never** calls the news API directly. A background worker polls the news API on a schedule, generates summaries via the Gemini API, and caches everything in Postgres. Users only ever read from our own database — so API call volume is fixed by the polling schedule, not by user traffic, which keeps us under rate limits.
 
 ## Security note
 
@@ -55,7 +55,7 @@ The app needs no device sensors — just an internet connection. Because it depe
 
 ## Getting started
 
-> Prerequisites: a [Supabase](https://supabase.com) project and a Claude API key.
+> Prerequisites: a [Supabase](https://supabase.com) project and a Gemini API key.
 
 ```bash
 # 1. Clone
@@ -79,7 +79,7 @@ SUPABASE_URL=
 SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=   # backend only — never ship to the client
 NEWS_API_KEY=
-CLAUDE_API_KEY=
+GEMINI_API_KEY=
 ```
 
 ## Project structure
