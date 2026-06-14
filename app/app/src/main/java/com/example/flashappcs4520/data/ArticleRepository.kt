@@ -21,7 +21,7 @@ class ArticleRepository {
         withContext(Dispatchers.IO) {
             SupabaseProvider.client
                 .from("articles")
-                .select(Columns.list("web_title", "summary", "image_url", "web_url", "published_at")) {
+                .select(Columns.list("id", "web_title", "summary", "image_url", "web_url", "published_at")) {
                     order("published_at", Order.DESCENDING)
                     limit(count)
                 }
