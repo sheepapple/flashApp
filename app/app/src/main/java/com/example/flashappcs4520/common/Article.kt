@@ -13,6 +13,8 @@ import java.time.format.DateTimeFormatter
  */
 @Serializable
 data class Article (
+    val id: Long? = null,   // articles.id (assumed bigint); used to link comments
+
     @SerialName("web_title")
     val webTitle: String,
 
