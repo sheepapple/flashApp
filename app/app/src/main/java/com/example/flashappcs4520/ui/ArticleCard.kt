@@ -58,6 +58,7 @@ fun ArticleCard(
 ) {
     var expanded by remember { mutableStateOf(initiallyExpanded) }
     var showComments by remember { mutableStateOf(initiallyShowComments) }
+    var showShareSheet by remember { mutableStateOf(false) }
 
     Card(
         onClick = {
@@ -70,7 +71,7 @@ fun ArticleCard(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column {
             // Header: title + "source · date" meta line (padded).
@@ -132,7 +133,10 @@ fun ArticleCard(
                         showComments = !showComments
                         onComment()
                     },
-                    onShare = onShare,
+                    onShare = {
+                        showShareSheet = true
+                        onShare()
+                    },
                     onSave = onSave,
                 )
 
@@ -145,6 +149,13 @@ fun ArticleCard(
                 }
             }
         }
+    }
+
+    if (showShareSheet) {
+        ShareSheet(
+            article = article,
+            onDismiss = { showShareSheet = false },
+        )
     }
 }
 
