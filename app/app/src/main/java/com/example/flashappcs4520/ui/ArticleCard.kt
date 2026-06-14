@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -117,8 +118,8 @@ fun ArticleCard(
 
             // Summary: truncated when collapsed, full when expanded.
             Text(
-                text = article.summary ?: "Summary coming soon…",
-                fontSize = 18.sp,
+                text = article.summary ?: "No summary available.",
+                fontSize = 16.sp,
                 lineHeight = 26.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = if (expanded) Int.MAX_VALUE else 2,
@@ -128,6 +129,7 @@ fun ArticleCard(
 
             // Action buttons appear only when expanded.
             if (expanded) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
                 ActionRow(
                     onComment = {
                         showComments = !showComments
@@ -222,6 +224,10 @@ private fun CommentsSection(
                 text = "No comments yet",
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
             )
         } else {
             comments.forEach { comment ->
@@ -275,7 +281,7 @@ private fun CommentsSection(
 private fun metaLine(article: Article): String {
     val source = runCatching { URI(article.webUrl).host?.removePrefix("www.") }
         .getOrNull() ?: "News"
-    return "$source · ${article.formattedDate()}"
+    return "$source · ${article.formattedDate()} · ${article.section}"
 }
 
 @Preview(showBackground = true, name = "Collapsed")

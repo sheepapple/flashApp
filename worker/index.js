@@ -1,5 +1,8 @@
-const { createClient } = require('@supabase/supabase-js')
+// Load env FIRST: summarize.js reads GEMINI_API_KEY at module load, so dotenv
+// must run before that require.
 require('dotenv').config({ path: '../.env' })
+const { createClient } = require('@supabase/supabase-js')
+const { generateSummary } = require('./summarize')
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -20,6 +23,9 @@ async function fetchAndStore() {
 
   // store into our supabase
   for (const article of articles) {
+    // Generate the summary before saving, so it's stored as part of the article.
+    const summary = await generateSummary(article.fields?.bodyText)
+
     const { error } = await supabase
       .from('articles')
       .upsert({
@@ -27,7 +33,9 @@ async function fetchAndStore() {
         web_url: article.webUrl,
         published_at: article.webPublicationDate,
         image_url: article.fields?.thumbnail,
-        raw_data: article
+        summary: summary,
+        raw_data: article,
+        section: article.sectionName,
       }, { onConflict: 'web_url' })
 
     if (error) console.error('Error inserting:', error.message)
