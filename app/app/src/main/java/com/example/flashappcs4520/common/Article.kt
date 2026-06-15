@@ -28,9 +28,10 @@ data class Article (
 
     @SerialName("published_at")
     val publishedAt: String,
+
+    @SerialName("section")
+    val section: String? = null
     ) {
-
-
     fun formattedDate(): String =
         try {
             OffsetDateTime.parse(publishedAt, TIMESTAMP_FORMAT)   // "2026-06-12 16:38:45+00"
