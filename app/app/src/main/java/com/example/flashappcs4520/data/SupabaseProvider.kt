@@ -3,6 +3,7 @@ package com.example.flashappcs4520.data
 import com.example.flashappcs4520.BuildConfig
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.auth.Auth
 
 /**
  * 1. What: The single, shared Supabase client for the whole app.
@@ -19,5 +20,6 @@ object SupabaseProvider {
         supabaseKey = BuildConfig.SUPABASE_ANON_KEY,
     ) {
         install(Postgrest)
+        install(Auth)
     }
 }

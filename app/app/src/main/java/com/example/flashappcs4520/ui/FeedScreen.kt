@@ -44,9 +44,10 @@ import com.example.flashappcs4520.ui.theme.FlashAppCS4520Theme
 @Composable
 fun FeedScreen(
     articleViewModel: ArticleViewModel,
+    onProfileClick: () -> Unit = {},
 ) {
     val state by articleViewModel.state.collectAsStateWithLifecycle()
-    FeedContent(state = state)
+    FeedContent(state = state,onProfileClick = onProfileClick)
 }
 
 /** Stateless feed UI — easy to preview with mock state. */
