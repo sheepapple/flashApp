@@ -37,4 +37,17 @@ class ProfileViewModel(
             }
         }
     }
+
+    fun toggleTopic(topic: String) {
+        val current = _user.value?.interests ?: emptyList()
+        val updated = if (topic in current) current - topic else current + topic
+        viewModelScope.launch {
+            try {
+                repository.updateInterests(updated)
+                _user.value = _user.value?.copy(interests = updated)
+            } catch (e: Exception) {
+                Log.e("ProfileViewModel", "Failed to update interests", e)
+            }
+        }
+    }
 }

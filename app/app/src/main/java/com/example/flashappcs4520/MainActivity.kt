@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
                             interests = user?.interests ?: emptyList(),
                             onBackClick = { screen = "feed" },
                             onUsernameChange = { profileViewModel.updateUsername(it) },
+                            onTopicToggle = { profileViewModel.toggleTopic(it) },
                         )
                     }
                 }
