@@ -1,5 +1,6 @@
 package com.example.flashappcs4520.ui
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.flashappcs4520.common.User
@@ -28,8 +29,12 @@ class ProfileViewModel(
 
     fun updateUsername(newUsername: String) {
         viewModelScope.launch {
-            repository.updateUsername(newUsername)
-            _user.value = _user.value?.copy(username = newUsername)
+            try {
+                repository.updateUsername(newUsername)
+                _user.value = _user.value?.copy(username = newUsername)
+            } catch (e: Exception) {
+                Log.e("ProfileViewModel", "Failed to update username", e)
+            }
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.example.flashappcs4520.data
 
+import android.util.Log
 import com.example.flashappcs4520.common.User
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
@@ -28,11 +29,14 @@ class UserRepository {
 
     suspend fun updateUsername(newUsername: String) =
         withContext(Dispatchers.IO) {
-            val uid = SupabaseProvider.client.auth.currentUserOrNull()?.id ?: return@withContext
+            val uid = SupabaseProvider.client.auth.currentUserOrNull()?.id
+            Log.d("UPDATE_DEBUG", "uid = $uid")   // 看 Logcat，uid 是不是 null
+            if (uid == null) return@withContext
             SupabaseProvider.client
                 .from("users")
                 .update({ set("username", newUsername) }) {
                     filter { eq("id", uid) }
                 }
+            Log.d("UPDATE_DEBUG", "update call finished")  // 看这行有没有打出来
         }
 }
