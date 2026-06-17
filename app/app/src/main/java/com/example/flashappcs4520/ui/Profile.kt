@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.flashappcs4520.common.AVAILABLE_TOPICS
 import com.example.flashappcs4520.ui.theme.FlashAppCS4520Theme
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -41,6 +42,8 @@ fun ProfileScreen(
     userName: String = "username",
     interests: List<String> = emptyList(),
     onBackClick: () -> Unit = {},
+    onUsernameChange: (String) -> Unit = {},
+    onTopicToggle: (String) -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -76,7 +79,6 @@ fun ProfileScreen(
                 .padding(horizontal = 24.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Avatar placeholder
             Box(
                 modifier = Modifier
                     .size(96.dp)
@@ -102,7 +104,6 @@ fun ProfileScreen(
 
             Spacer(Modifier.height(32.dp))
 
-            // Interests section
             Column(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.Start,
@@ -114,22 +115,13 @@ fun ProfileScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 10.dp),
                 )
-
-                if (interests.isEmpty()) {
-                    Text(
-                        text = "No interests yet.",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    )
-                } else {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        interests.forEach { topic ->
-                            FilterChip(
-                                selected = true,
-                                onClick = {},
-                                label = { Text(topic) },
-                            )
-                        }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AVAILABLE_TOPICS.forEach { topic ->
+                        FilterChip(
+                            selected = topic in interests,
+                            onClick = { onTopicToggle(topic) },
+                            label = { Text(topic) },
+                        )
                     }
                 }
             }
@@ -143,7 +135,7 @@ fun ProfileScreenPreview() {
     FlashAppCS4520Theme {
         ProfileScreen(
             userName = "testUser",
-            interests = listOf("Technology", "Finance"),
+            interests = listOf("Technology", "Football"),
         )
     }
 }
