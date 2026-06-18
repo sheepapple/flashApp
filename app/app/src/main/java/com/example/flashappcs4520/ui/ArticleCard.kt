@@ -48,10 +48,14 @@ import java.net.URI
 @Composable
 fun ArticleCard(
     article: Article,
+    liked: Boolean = false,
+    likeCount: Int = 0,
+    onLikeToggle: () -> Unit = {},
+    saved: Boolean = false,
+    onSaveToggle: () -> Unit = {},
     onClick: () -> Unit = {},
     onComment: () -> Unit = {},
     onShare: () -> Unit = {},
-    onSave: () -> Unit = {},
     comments: List<Comment> = emptyList(),
     onSendComment: (String) -> Unit = {},
     initiallyExpanded: Boolean = false,
@@ -131,6 +135,9 @@ fun ArticleCard(
             if (expanded) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
                 ActionRow(
+                    liked = liked,
+                    likeCount = likeCount,
+                    onLikeToggle = onLikeToggle,
                     onComment = {
                         showComments = !showComments
                         onComment()
@@ -139,7 +146,8 @@ fun ArticleCard(
                         showShareSheet = true
                         onShare()
                     },
-                    onSave = onSave,
+                    saved = saved,
+                    onSaveToggle = onSaveToggle,
                 )
 
                 // Comments section appears when the comment button is toggled on.
@@ -163,13 +171,15 @@ fun ArticleCard(
 
 @Composable
 private fun ActionRow(
+    liked: Boolean,
+    likeCount: Int,
+    onLikeToggle: () -> Unit,
     onComment: () -> Unit,
     onShare: () -> Unit,
-    onSave: () -> Unit,
+    saved: Boolean,
+    onSaveToggle: () -> Unit,
 ) {
-    // Like + save are local toggles for now (no persistence yet); the rest are stubs.
-    var liked by remember { mutableStateOf(false) }
-    var saved by remember { mutableStateOf(false) }
+    // Like and save are both persisted; their state is owned by the ViewModel.
     val iconTint = MaterialTheme.colorScheme.onSurfaceVariant
 
     Row(
@@ -177,14 +187,25 @@ private fun ActionRow(
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = { liked = !liked }) {
-            Icon(
-                painter = painterResource(if (liked) R.drawable.ic_liked else R.drawable.ic_like),
-                contentDescription = "Like",
-                // ic_liked is already red; leave it untinted so its own color shows.
-                tint = if (liked) Color.Unspecified else iconTint,
-            )
+        // Like button + total count.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onLikeToggle) {
+                Icon(
+                    painter = painterResource(if (liked) R.drawable.ic_liked else R.drawable.ic_like),
+                    contentDescription = "Like",
+                    // ic_liked is already red; leave it untinted so its own color shows.
+                    tint = if (liked) Color.Unspecified else iconTint,
+                )
+            }
+            if (likeCount > 0) {
+                Text(
+                    text = "$likeCount",
+                    fontSize = 14.sp,
+                    color = iconTint,
+                )
+            }
         }
         IconButton(onClick = onComment) {
             Icon(painterResource(R.drawable.ic_comment), contentDescription = "Comment", tint = iconTint)
@@ -192,10 +213,7 @@ private fun ActionRow(
         IconButton(onClick = onShare) {
             Icon(painterResource(R.drawable.ic_share), contentDescription = "Share", tint = iconTint)
         }
-        IconButton(onClick = {
-            saved = !saved
-            onSave()
-        }) {
+        IconButton(onClick = onSaveToggle) {
             Icon(
                 painter = painterResource(if (saved) R.drawable.ic_bookmarked else R.drawable.ic_bookmark),
                 contentDescription = "Save",

@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.flashappcs4520.ui.ArticleViewModel
 import com.example.flashappcs4520.ui.FeedScreen
@@ -48,10 +49,18 @@ class MainActivity : ComponentActivity() {
                             userName = user?.username ?: "Loading…",
                             interests = user?.interests ?: emptyList(),
                             onBackClick = { screen = "feed" },
+                            onSettingsClick = { screen = "settings" },
+                            onNotificationsClick = { screen = "notifications" },
+                            onSavedClick = { screen = "saved" },
+                            onCommentsClick = { screen = "comments" },
                             onUsernameChange = { profileViewModel.updateUsername(it) },
                             onTopicToggle = { profileViewModel.toggleTopic(it) },
                         )
                     }
+                    "settings" -> {} // TODO settings screen (see settingsScreen.kt class stub)
+                    "notifications" -> {} // TODO notifications screen
+                    "saved" -> {}
+                    "comments" -> {}
                 }
             }
         }

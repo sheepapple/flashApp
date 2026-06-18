@@ -12,9 +12,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
@@ -47,7 +52,12 @@ fun FeedScreen(
     onProfileClick: () -> Unit = {},
 ) {
     val state by articleViewModel.state.collectAsStateWithLifecycle()
-    FeedContent(state = state,onProfileClick = onProfileClick)
+    FeedContent(
+        state = state,
+        onProfileClick = onProfileClick,
+        onLikeToggle = { article -> article.id?.let { articleViewModel.toggleLike(it) } },
+        onSaveToggle = { article -> article.id?.let { articleViewModel.toggleSave(it) } },
+    )
 }
 
 /** Stateless feed UI — easy to preview with mock state. */
@@ -58,14 +68,19 @@ fun FeedContent(
     onArticleClick: (Article) -> Unit = {},
     onBackClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
+    onLikeToggle: (Article) -> Unit = {},
+    onSaveToggle: (Article) -> Unit = {},
 ) {
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(
+                        onClick = onBackClick,
+                        modifier = Modifier.padding(start = 8.dp)
+                    ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                            imageVector = Icons.AutoMirrored.Filled.Logout,
                             contentDescription = "Back",
                             tint = MaterialTheme.colorScheme.primary,
                         )
@@ -88,10 +103,13 @@ fun FeedContent(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onProfileClick) {
+                    IconButton(
+                        onClick = onProfileClick,
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .fillMaxSize()
                                 .background(
                                     MaterialTheme.colorScheme.secondaryContainer,
                                     CircleShape,
@@ -102,7 +120,7 @@ fun FeedContent(
                                 imageVector = Icons.Default.Person,
                                 contentDescription = "Profile",
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(24.dp),
                             )
                         }
                     }
@@ -152,6 +170,11 @@ fun FeedContent(
                         ) { article ->
                             ArticleCard(
                                 article = article,
+                                liked = article.id != null && article.id in state.likedByMe,
+                                likeCount = article.id?.let { state.likeCounts[it] } ?: 0,
+                                onLikeToggle = { onLikeToggle(article) },
+                                saved = article.id != null && article.id in state.savedByMe,
+                                onSaveToggle = { onSaveToggle(article) },
                                 onClick = { onArticleClick(article) },
                             )
                         }
