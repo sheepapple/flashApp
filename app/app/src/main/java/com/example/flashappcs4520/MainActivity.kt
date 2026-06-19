@@ -45,6 +45,8 @@ class MainActivity : ComponentActivity() {
                             articleViewModel = articleViewModel,
                             avatarUrl = user?.avatarUrl,
                             onProfileClick = { screen = "profile" },
+                            // on feedScreen, exit back to login page
+                            onLogoutClick = { screen = "login" },
                         )
                     }
                     "profile" -> {

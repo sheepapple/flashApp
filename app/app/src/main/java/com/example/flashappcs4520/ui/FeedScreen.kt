@@ -54,12 +54,14 @@ fun FeedScreen(
     articleViewModel: ArticleViewModel,
     avatarUrl: String? = null,
     onProfileClick: () -> Unit = {},
+    onLogoutClick: () -> Unit = {},
 ) {
     val state by articleViewModel.state.collectAsStateWithLifecycle()
     FeedContent(
         state = state,
         avatarUrl = avatarUrl,
         onProfileClick = onProfileClick,
+        onBackClick = onLogoutClick,
         onLikeToggle = { article -> article.id?.let { articleViewModel.toggleLike(it) } },
         onSaveToggle = { article -> article.id?.let { articleViewModel.toggleSave(it) } },
     )
