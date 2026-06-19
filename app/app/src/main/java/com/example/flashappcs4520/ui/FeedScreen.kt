@@ -203,6 +203,7 @@ fun FeedContent(
                                 onSaveToggle = { onSaveToggle(article) },
                                 comments = article.id?.let { state.comments[it] } ?: emptyList(),
                                 onComment = { onCommentOpen(article) },
+                                commentCount = article.id?.let { state.commentCounts[it] } ?: 0,
                                 onSendComment = { text, parentId -> onSendComment(article, text, parentId) },
                                 onClick = { onArticleClick(article) },
                             )

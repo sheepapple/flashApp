@@ -29,6 +29,22 @@ class CommentRepository {
                 .decodeList<Comment>()
         }
 
+    /** Total comment count per article (replies included), for the feed badge. One lightweight
+     *  query (just the articleID column), grouped client-side. */
+    suspend fun fetchCommentCounts(articleIDs: List<Long>): Map<Long, Int> =
+        withContext(Dispatchers.IO) {
+            if (articleIDs.isEmpty()) return@withContext emptyMap()
+            SupabaseProvider.client
+                .from("comments")
+                .select(Columns.list("articleID")) {
+                    filter { isIn("articleID", articleIDs) }
+                }
+                .decodeList<Comment>()
+                .mapNotNull { it.articleId }
+                .groupingBy { it }
+                .eachCount()
+        }
+
     /** Only the columns we set; id/created_at use their DB defaults. parentID is null for a
      *  top-level comment, or the id of the comment being replied to. */
     @Serializable

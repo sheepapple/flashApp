@@ -10,19 +10,29 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,7 +40,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -95,20 +108,25 @@ private val COMMENT_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d")
 /** A Postgres timestamptz → a short relative label: "just now", "5m", "2h", "3d", or "Jun 19". */
 private fun formatRelative(timestamp: String?): String {
     if (timestamp.isNullOrBlank()) return ""
-    return try {
-        val then = OffsetDateTime.parse(timestamp, COMMENT_TS_FORMAT)
-        val minutes = ChronoUnit.MINUTES.between(then, OffsetDateTime.now())
-        when {
-            minutes < 1 -> "just now"
-            minutes < 60 -> "${minutes}m"
-            minutes < 1_440 -> "${minutes / 60}h"
-            minutes < 10_080 -> "${minutes / 1_440}d"
-            else -> then.format(COMMENT_DATE_FORMAT)
-        }
-    } catch (e: Exception) {
-        timestamp.take(10)
+    val then = parseTimestamp(timestamp) ?: return timestamp.take(10)
+    val minutes = ChronoUnit.MINUTES.between(then, OffsetDateTime.now())
+    return when {
+        minutes < 1 -> "just now"
+        minutes < 60 -> "${minutes}m"
+        minutes < 1_440 -> "${minutes / 60}h"
+        minutes < 10_080 -> "${minutes / 1_440}d"
+        else -> then.format(COMMENT_DATE_FORMAT)
     }
 }
+
+/**
+ * Parses the timestamptz PostgREST returns — ISO 8601 with a 'T' and possibly fractional seconds,
+ * e.g. "2026-06-19T09:00:00.123456+00:00" — falling back to the space-separated form just in case.
+ */
+private fun parseTimestamp(ts: String): OffsetDateTime? =
+    runCatching { OffsetDateTime.parse(ts) }
+        .recoverCatching { OffsetDateTime.parse(ts, COMMENT_TS_FORMAT) }
+        .getOrNull()
 
 /** The full comments thread for an article: a list of top-level comments, each expandable. */
 @Composable
@@ -130,6 +148,148 @@ fun CommentsSection(
         } else {
             comments.forEach { comment ->
                 CommentItem(comment = comment, depth = 0, onReply = onReply)
+            }
+        }
+    }
+}
+
+/**
+ * The comments "layer": a tall bottom sheet hosting the scrolling thread with the input pinned
+ * to its bottom. Rises over a scrim; drag-down or scrim-tap dismisses it without touching the
+ * feed behind. Tapping Reply focuses the input and raises the keyboard.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CommentsSheet(
+    comments: List<CommentUi>,
+    onDismiss: () -> Unit,
+    onSendComment: (text: String, parentId: String?) -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var replyingTo by remember { mutableStateOf<CommentUi?>(null) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.9f)
+                .imePadding(),
+        ) {
+            Text(
+                text = "Comments",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(start = 16.dp, bottom = 8.dp),
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
+
+            // The thread scrolls in the space between the header and the pinned input bar.
+            CommentsSection(
+                comments = comments,
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                onReply = { replyingTo = it },
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
+            CommentInputBar(
+                replyingTo = replyingTo,
+                onCancelReply = { replyingTo = null },
+                onSend = { text ->
+                    onSendComment(text, replyingTo?.id)
+                    replyingTo = null
+                },
+            )
+        }
+    }
+}
+
+/**
+ * The pinned input row at the bottom of the comments sheet. Shows a "Replying to {username}"
+ * label (with cancel) when replying, and pulls focus so the keyboard opens when a reply starts.
+ */
+@Composable
+private fun CommentInputBar(
+    replyingTo: CommentUi?,
+    onCancelReply: () -> Unit,
+    onSend: (String) -> Unit,
+) {
+    var draft by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(replyingTo) {
+        if (replyingTo != null) focusRequester.requestFocus()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        if (replyingTo != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Replying to ${replyingTo.username}",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "Cancel",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .clickable { onCancelReply() },
+                )
+            }
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                placeholder = { Text(if (replyingTo == null) "Add a comment…" else "Write a reply…") },
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester),
+                shape = RoundedCornerShape(percent = 50),
+            )
+            IconButton(
+                onClick = {
+                    if (draft.isNotBlank()) {
+                        onSend(draft.trim())
+                        draft = ""
+                        focusManager.clearFocus()   // dismiss the keyboard after posting
+                    }
+                },
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_reply),
+                        contentDescription = "Send comment",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
         }
     }
