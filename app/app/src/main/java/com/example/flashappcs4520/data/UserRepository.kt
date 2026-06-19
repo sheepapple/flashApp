@@ -1,7 +1,7 @@
 package com.example.flashappcs4520.data
 
 import android.util.Log
-import com.example.flashappcs4520.common.User
+import com.example.flashappcs4520.ui.User
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +28,7 @@ class UserRepository {
                 .firstOrNull()
         }
 
+    // writes change to db
     suspend fun updateUsername(newUsername: String) =
         withContext(Dispatchers.IO) {
             val uid = SupabaseProvider.client.auth.currentUserOrNull()?.id
@@ -51,5 +52,25 @@ class UserRepository {
                 .update({ set("topicofinterest", newInterests) }) {
                     filter { eq("id", uid) }
                 }
+        }
+
+    // writes change of url to db
+    suspend fun updateAvatarUrl(url: String) =
+        withContext(Dispatchers.IO) {
+            val uid = SupabaseProvider.client.auth.currentUserOrNull()?.id
+                ?: throw IllegalStateException("No authenticated user")
+            SupabaseProvider.client
+                .from("users")
+                .update({ set("profilepicture_url", url) }) {
+                    filter { eq("id", uid) }
+                }
+        }
+
+    // calls Supabase auth.updateUser to update the new password
+    suspend fun updatePassword(newPassword: String) =
+        withContext(Dispatchers.IO) {
+            SupabaseProvider.client.auth.updateUser {
+                password = newPassword
+            }
         }
 }

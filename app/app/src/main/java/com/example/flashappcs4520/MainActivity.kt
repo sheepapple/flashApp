@@ -17,6 +17,8 @@ import com.example.flashappcs4520.ui.ProfileScreen
 import com.example.flashappcs4520.ui.ProfileViewModel
 import com.example.flashappcs4520.ui.SignUpScreen
 import com.example.flashappcs4520.ui.theme.FlashAppCS4520Theme
+import com.example.flashappcs4520.ui.SettingScreen
+import com.example.flashappcs4520.ui.SettingViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,9 +39,14 @@ class MainActivity : ComponentActivity() {
                     )
                     "feed" -> {
                         val articleViewModel: ArticleViewModel = viewModel()
+                        val profileViewModel: ProfileViewModel = viewModel()
+                        val user by profileViewModel.user.collectAsStateWithLifecycle()
                         FeedScreen(
                             articleViewModel = articleViewModel,
+                            avatarUrl = user?.avatarUrl,
                             onProfileClick = { screen = "profile" },
+                            // on feedScreen, exit back to login page
+                            onLogoutClick = { screen = "login" },
                         )
                     }
                     "profile" -> {
@@ -47,6 +54,7 @@ class MainActivity : ComponentActivity() {
                         val user by profileViewModel.user.collectAsStateWithLifecycle()
                         ProfileScreen(
                             userName = user?.username ?: "Loading…",
+                            avatarUrl = user?.avatarUrl,
                             interests = user?.interests ?: emptyList(),
                             onBackClick = { screen = "feed" },
                             onSettingsClick = { screen = "settings" },
@@ -57,7 +65,22 @@ class MainActivity : ComponentActivity() {
                             onTopicToggle = { profileViewModel.toggleTopic(it) },
                         )
                     }
-                    "settings" -> {} // TODO settings screen (see settingsScreen.kt class stub)
+                    "settings" -> {
+                        // renders SettingScreen with current user data
+                        val profileViewModel: ProfileViewModel = viewModel()
+                        val user by profileViewModel.user.collectAsStateWithLifecycle()
+                        val settingsViewModel: SettingViewModel = viewModel()
+                        SettingScreen(
+                            currentUsername = user?.username ?: "",
+                            currentAvatarUrl = user?.avatarUrl,
+                            onBackClick = {
+                                // Refresh profile data when returning from settings
+                                profileViewModel.refresh()
+                                screen = "profile"
+                            },
+                            viewModel = settingsViewModel,
+                        )
+                    }
                     "notifications" -> {} // TODO notifications screen
                     "saved" -> {}
                     "comments" -> {}

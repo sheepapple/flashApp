@@ -11,15 +11,16 @@ import kotlinx.serialization.Serializable
  * Schema (public.comments):
  *   id         uuid
  *   created_at timestamptz
- *   articleId  -> public.articles.id   (assumed bigint; switch to String if uuid)
+ *   articleID  -> public.articles.id   (int8; matches likes/saves naming)
  *   userID     uuid -> auth.users.id
  *   text       text
+ *   parentID   uuid (nullable, for threaded replies)
  */
 @Serializable
 data class Comment(
     val id: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
-    @SerialName("articleId") val articleId: Long? = null,
+    @SerialName("articleID") val articleId: Long? = null,
     @SerialName("userID") val userId: String? = null,
     val text: String = "",
 )

@@ -45,7 +45,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import coil.compose.AsyncImage
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -59,6 +62,7 @@ import com.example.flashappcs4520.ui.theme.FlashAppCS4520Theme
 @Composable
 fun ProfileScreen(
     userName: String = "username",
+    avatarUrl: String? = null,
     interests: List<String> = emptyList(),
     onBackClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
@@ -119,12 +123,24 @@ fun ProfileScreen(
                     .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "Profile picture",
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(52.dp),
-                )
+                // take profile url as change now
+                if (!avatarUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = avatarUrl,
+                        contentDescription = "Profile picture",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(96.dp)
+                            .clip(CircleShape),
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "Profile picture",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(52.dp),
+                    )
+                }
             }
 
             Spacer(Modifier.height(16.dp))
