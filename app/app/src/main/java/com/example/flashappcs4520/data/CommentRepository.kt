@@ -15,12 +15,12 @@ import kotlinx.coroutines.withContext
 class CommentRepository {
 
     /** Loads all comments for one article, oldest first. Works with the anon key + a read RLS policy. */
-    suspend fun fetchComments(articleId: Long): List<Comment> =
+    suspend fun fetchComments(articleID: Long): List<Comment> =
         withContext(Dispatchers.IO) {
             SupabaseProvider.client
                 .from("comments")
-                .select(Columns.list("id", "created_at", "articleId", "userID", "text")) {
-                    filter { eq("articleId", articleId) }
+                .select(Columns.list("id", "created_at", "articleID", "userID", "text")) {
+                    filter { eq("articleID", articleID) }
                     order("created_at", Order.ASCENDING)
                 }
                 .decodeList<Comment>()
@@ -31,9 +31,9 @@ class CommentRepository {
      * Before this can be implemented:
      *   1. Add Supabase Auth (login) so there is a signed-in user.
      *   2. Set the `userID` column default to `auth.uid()` and add an INSERT RLS policy.
-     *   3. Then insert { articleId, text } here (the DB stamps userID from the session).
+     *   3. Then insert { articleID, text } here (the DB stamps userID from the session).
      */
-    suspend fun addComment(articleId: Long, text: String) {
+    suspend fun addComment(articleID: Long, text: String) {
         // intentionally empty — see KDoc above
     }
 }

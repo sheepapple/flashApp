@@ -21,6 +21,9 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,11 +52,13 @@ import com.example.flashappcs4520.ui.theme.FlashAppCS4520Theme
 @Composable
 fun FeedScreen(
     articleViewModel: ArticleViewModel,
+    avatarUrl: String? = null,
     onProfileClick: () -> Unit = {},
 ) {
     val state by articleViewModel.state.collectAsStateWithLifecycle()
     FeedContent(
         state = state,
+        avatarUrl = avatarUrl,
         onProfileClick = onProfileClick,
         onLikeToggle = { article -> article.id?.let { articleViewModel.toggleLike(it) } },
         onSaveToggle = { article -> article.id?.let { articleViewModel.toggleSave(it) } },
@@ -65,6 +70,7 @@ fun FeedScreen(
 @Composable
 fun FeedContent(
     state: ArticleFeedState,
+    avatarUrl: String? = null,
     onArticleClick: (Article) -> Unit = {},
     onBackClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
@@ -116,12 +122,24 @@ fun FeedContent(
                                 ),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "Profile",
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.size(24.dp),
-                            )
+                            // take profile url as change now
+                            if (!avatarUrl.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = avatarUrl,
+                                    contentDescription = "Profile",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape),
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "Profile",
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
                         }
                     }
                 },
