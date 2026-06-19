@@ -39,7 +39,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.flashappcs4520.R
+import com.example.flashappcs4520.common.Comment
+import com.example.flashappcs4520.common.Profile
 import com.example.flashappcs4520.ui.theme.FlashAppCS4520Theme
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 /**
  * UI model for one comment in a thread. Decoupled from the DB `Comment` for now: it carries
@@ -54,6 +59,56 @@ data class CommentUi(
     val text: String,
     val replies: List<CommentUi> = emptyList(),
 )
+
+/**
+ * Builds the [CommentUi] reply tree from a flat list of DB comments plus a profile lookup.
+ *
+ * Pure (no I/O): the caller fetches the comments and the profiles; this assembles them — nesting
+ * each comment under its `parentId`, resolving the author's username/avatar, and formatting the
+ * timestamp. Comments arrive oldest-first, and groupBy preserves that, so siblings stay in order.
+ *
+ * A missing profile falls back to "Unknown"; a reply whose parent isn't in the list is dropped
+ * (won't happen in normal use, since we fetch all of an article's comments together).
+ */
+fun buildCommentUiTree(
+    comments: List<Comment>,
+    profiles: Map<String, Profile>,
+): List<CommentUi> {
+    val byParent = comments.groupBy { it.parentId }
+    fun toUi(comment: Comment): CommentUi {
+        val profile = comment.userId?.let { profiles[it] }
+        return CommentUi(
+            id = comment.id.orEmpty(),
+            username = profile?.username?.takeIf { it.isNotBlank() } ?: "Unknown",
+            avatarUrl = profile?.avatarUrl,
+            timestamp = formatRelative(comment.createdAt),
+            text = comment.text,
+            replies = byParent[comment.id].orEmpty().map(::toUi),
+        )
+    }
+    return byParent[null].orEmpty().map(::toUi)
+}
+
+private val COMMENT_TS_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ssx")
+private val COMMENT_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d")
+
+/** A Postgres timestamptz → a short relative label: "just now", "5m", "2h", "3d", or "Jun 19". */
+private fun formatRelative(timestamp: String?): String {
+    if (timestamp.isNullOrBlank()) return ""
+    return try {
+        val then = OffsetDateTime.parse(timestamp, COMMENT_TS_FORMAT)
+        val minutes = ChronoUnit.MINUTES.between(then, OffsetDateTime.now())
+        when {
+            minutes < 1 -> "just now"
+            minutes < 60 -> "${minutes}m"
+            minutes < 1_440 -> "${minutes / 60}h"
+            minutes < 10_080 -> "${minutes / 1_440}d"
+            else -> then.format(COMMENT_DATE_FORMAT)
+        }
+    } catch (e: Exception) {
+        timestamp.take(10)
+    }
+}
 
 /** The full comments thread for an article: a list of top-level comments, each expandable. */
 @Composable
@@ -273,22 +328,36 @@ private val previewComments = listOf(
     CommentUi(id = "5", username = "dave", timestamp = "5h", text = "First!"),
 )
 
-@Preview(showBackground = true, name = "Comments thread")
-@Composable
-private fun CommentsSectionPreview() {
-    FlashAppCS4520Theme {
-        Surface(color = MaterialTheme.colorScheme.surface) {
-            CommentsSection(comments = previewComments, modifier = Modifier.padding(16.dp))
-        }
-    }
-}
-
 @Preview(showBackground = true, name = "Empty")
 @Composable
 private fun CommentsSectionEmptyPreview() {
     FlashAppCS4520Theme {
         Surface(color = MaterialTheme.colorScheme.surface) {
             CommentsSection(comments = emptyList(), modifier = Modifier.padding(16.dp))
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Mapped from DB rows")
+@Composable
+private fun CommentsSectionMappedPreview() {
+    // Flat rows as they'd come back from the DB (note the parentId links), plus a profile lookup.
+    val rows = listOf(
+        Comment(id = "1", createdAt = "2026-06-19 09:00:00+00", articleId = 1, userId = "u-alice", text = "Top-level comment."),
+        Comment(id = "2", createdAt = "2026-06-19 10:30:00+00", articleId = 1, userId = "u-bob", text = "A reply to the first comment.", parentId = "1"),
+        Comment(id = "3", createdAt = "2026-06-19 11:00:00+00", articleId = 1, userId = "u-alice", text = "And a reply to that reply.", parentId = "2"),
+        Comment(id = "4", createdAt = "2026-06-19 08:00:00+00", articleId = 1, userId = "u-ghost", text = "Author with no profile row."),
+    )
+    val profiles = mapOf(
+        "u-alice" to Profile(id = "u-alice", username = "alice"),
+        "u-bob" to Profile(id = "u-bob", username = "bob"),
+    )
+    FlashAppCS4520Theme {
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            CommentsSection(
+                comments = buildCommentUiTree(rows, profiles),
+                modifier = Modifier.padding(16.dp),
+            )
         }
     }
 }

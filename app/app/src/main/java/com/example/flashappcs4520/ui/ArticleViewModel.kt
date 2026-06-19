@@ -9,6 +9,7 @@ import com.example.flashappcs4520.data.AuthRepository
 import com.example.flashappcs4520.data.CommentRepository
 import com.example.flashappcs4520.data.LikeRepository
 import com.example.flashappcs4520.data.SaveRepository
+import com.example.flashappcs4520.data.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,6 +27,7 @@ data class ArticleFeedState(
     val likeCounts: Map<Long, Int> = emptyMap(),
     val likedByMe: Set<Long> = emptySet(),
     val savedByMe: Set<Long> = emptySet(),
+    val comments: Map<Long, List<CommentUi>> = emptyMap(),
     val error: String? = null,
 )
 
@@ -34,6 +36,7 @@ class ArticleViewModel(
     private val likeRepository: LikeRepository = LikeRepository(),
     private val saveRepository: SaveRepository = SaveRepository(),
     private val commentRepository: CommentRepository = CommentRepository(),
+    private val userRepository: UserRepository = UserRepository(),
     private val authRepository: AuthRepository = AuthRepository(),
 ) : ViewModel() {
 
@@ -138,14 +141,31 @@ class ArticleViewModel(
         }
     }
 
-    /** Inserts a comment for an article. Errors are logged (visible in Logcat under "Comments"). */
+    /** Fetches an article's comments + author profiles, maps them to a UI tree, and stores it. */
+    fun loadComments(articleId: Long) {
+        viewModelScope.launch { refreshComments(articleId) }
+    }
+
+    /** Inserts a comment for an article, then refreshes the thread so it appears immediately. */
     fun addComment(articleId: Long, text: String) {
         viewModelScope.launch {
             try {
                 commentRepository.addComment(articleId, text)
+                refreshComments(articleId)
             } catch (e: Exception) {
                 Log.e("Comments", "Failed to post comment on article $articleId", e)
             }
+        }
+    }
+
+    /** Loads an article's comments + profiles, maps to the UI tree, and updates state. */
+    private suspend fun refreshComments(articleId: Long) {
+        try {
+            val rows = commentRepository.fetchComments(articleId)
+            val profiles = userRepository.fetchProfiles(rows.mapNotNull { it.userId })
+            _state.update { it.copy(comments = it.comments + (articleId to buildCommentUiTree(rows, profiles))) }
+        } catch (e: Exception) {
+            Log.e("Comments", "Failed to load comments for article $articleId", e)
         }
     }
 }

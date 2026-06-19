@@ -22,7 +22,7 @@ class CommentRepository {
         withContext(Dispatchers.IO) {
             SupabaseProvider.client
                 .from("comments")
-                .select(Columns.list("id", "created_at", "articleID", "userID", "text")) {
+                .select(Columns.list("id", "created_at", "articleID", "userID", "text", "parentID")) {
                     filter { eq("articleID", articleID) }
                     order("created_at", Order.ASCENDING)
                 }

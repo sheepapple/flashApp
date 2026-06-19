@@ -33,7 +33,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -41,7 +40,6 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.flashappcs4520.R
 import com.example.flashappcs4520.common.Article
-import com.example.flashappcs4520.common.Comment
 import com.example.flashappcs4520.ui.theme.FlashAppCS4520Theme
 import java.net.URI
 
@@ -56,7 +54,7 @@ fun ArticleCard(
     onClick: () -> Unit = {},
     onComment: () -> Unit = {},
     onShare: () -> Unit = {},
-    comments: List<Comment> = emptyList(),
+    comments: List<CommentUi> = emptyList(),
     onSendComment: (String) -> Unit = {},
     initiallyExpanded: Boolean = false,
     initiallyShowComments: Boolean = false,
@@ -152,10 +150,12 @@ fun ArticleCard(
 
                 // Comments section appears when the comment button is toggled on.
                 if (showComments) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
                     CommentsSection(
                         comments = comments,
-                        onSendComment = onSendComment,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     )
+                    CommentComposer(onSendComment = onSendComment)
                 }
             }
         }
@@ -224,41 +224,16 @@ private fun ActionRow(
     }
 }
 
+/** The "write a new comment" input row. Comment display lives in CommentsSection.kt. */
 @Composable
-private fun CommentsSection(
-    comments: List<Comment>,
+private fun CommentComposer(
     onSendComment: (String) -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
-
-        if (comments.isEmpty()) {
-            Text(
-                text = "No comments yet",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
-            )
-        } else {
-            comments.forEach { comment ->
-                Text(
-                    text = comment.text,
-                    fontSize = 15.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(vertical = 2.dp),
-                )
-            }
-        }
-
-        // Message box + send button (no-op for now; wired to onSendComment).
         var draft by remember { mutableStateOf("") }
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(

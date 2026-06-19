@@ -23,4 +23,5 @@ data class Comment(
     @SerialName("articleID") val articleId: Long? = null,
     @SerialName("userID") val userId: String? = null,
     val text: String = "",
+    @SerialName("parentID") val parentId: String? = null,
 )
