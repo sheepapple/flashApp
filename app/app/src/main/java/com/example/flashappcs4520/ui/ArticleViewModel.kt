@@ -1,10 +1,12 @@
 package com.example.flashappcs4520.ui
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.flashappcs4520.common.Article
 import com.example.flashappcs4520.data.ArticleRepository
 import com.example.flashappcs4520.data.AuthRepository
+import com.example.flashappcs4520.data.CommentRepository
 import com.example.flashappcs4520.data.LikeRepository
 import com.example.flashappcs4520.data.SaveRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +33,7 @@ class ArticleViewModel(
     private val repository: ArticleRepository = ArticleRepository(),
     private val likeRepository: LikeRepository = LikeRepository(),
     private val saveRepository: SaveRepository = SaveRepository(),
+    private val commentRepository: CommentRepository = CommentRepository(),
     private val authRepository: AuthRepository = AuthRepository(),
 ) : ViewModel() {
 
@@ -132,6 +135,17 @@ class ArticleViewModel(
             if (s.savedByMe.contains(articleId) == saved) return@update s   // no change
             val mine = s.savedByMe.toMutableSet().apply { if (saved) add(articleId) else remove(articleId) }
             s.copy(savedByMe = mine)
+        }
+    }
+
+    /** Inserts a comment for an article. Errors are logged (visible in Logcat under "Comments"). */
+    fun addComment(articleId: Long, text: String) {
+        viewModelScope.launch {
+            try {
+                commentRepository.addComment(articleId, text)
+            } catch (e: Exception) {
+                Log.e("Comments", "Failed to post comment on article $articleId", e)
+            }
         }
     }
 }

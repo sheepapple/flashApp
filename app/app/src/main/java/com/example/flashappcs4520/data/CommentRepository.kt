@@ -1,11 +1,14 @@
 package com.example.flashappcs4520.data
 
 import com.example.flashappcs4520.common.Comment
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * 1. What: Reads/writes comments for an article in the Supabase `comments` table.
@@ -26,14 +29,21 @@ class CommentRepository {
                 .decodeList<Comment>()
         }
 
-    /**
-     * No-op for now. Saving comments needs user authentication, which isn't set up yet.
-     * Before this can be implemented:
-     *   1. Add Supabase Auth (login) so there is a signed-in user.
-     *   2. Set the `userID` column default to `auth.uid()` and add an INSERT RLS policy.
-     *   3. Then insert { articleID, text } here (the DB stamps userID from the session).
-     */
-    suspend fun addComment(articleID: Long, text: String) {
-        // intentionally empty — see KDoc above
-    }
+    /** Only the columns we set; id/created_at use their DB defaults. */
+    @Serializable
+    private data class CommentInsert(
+        @SerialName("articleID") val articleId: Long,
+        @SerialName("userID") val userId: String,
+        val text: String,
+    )
+
+    /** Inserts one comment as the current user. */
+    suspend fun addComment(articleID: Long, text: String) =
+        withContext(Dispatchers.IO) {
+            val uid = SupabaseProvider.client.auth.currentUserOrNull()?.id
+                ?: throw IllegalStateException("No authenticated user")
+            SupabaseProvider.client
+                .from("comments")
+                .insert(CommentInsert(articleID, uid, text))
+        }
 }
