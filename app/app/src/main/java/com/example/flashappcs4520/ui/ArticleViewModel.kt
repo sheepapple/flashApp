@@ -146,11 +146,11 @@ class ArticleViewModel(
         viewModelScope.launch { refreshComments(articleId) }
     }
 
-    /** Inserts a comment for an article, then refreshes the thread so it appears immediately. */
-    fun addComment(articleId: Long, text: String) {
+    /** Posts a comment (or a reply, if [parentId] is set), then refreshes the thread. */
+    fun addComment(articleId: Long, text: String, parentId: String? = null) {
         viewModelScope.launch {
             try {
-                commentRepository.addComment(articleId, text)
+                commentRepository.addComment(articleId, text, parentId)
                 refreshComments(articleId)
             } catch (e: Exception) {
                 Log.e("Comments", "Failed to post comment on article $articleId", e)

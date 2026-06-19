@@ -20,10 +20,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -55,13 +62,17 @@ fun ArticleCard(
     onComment: () -> Unit = {},
     onShare: () -> Unit = {},
     comments: List<CommentUi> = emptyList(),
-    onSendComment: (String) -> Unit = {},
+    onSendComment: (text: String, parentId: String?) -> Unit = { _, _ -> },
     initiallyExpanded: Boolean = false,
     initiallyShowComments: Boolean = false,
 ) {
     var expanded by remember { mutableStateOf(initiallyExpanded) }
     var showComments by remember { mutableStateOf(initiallyShowComments) }
     var showShareSheet by remember { mutableStateOf(false) }
+    // The comment being replied to; null means the composer posts a top-level comment.
+    var replyingTo by remember { mutableStateOf<CommentUi?>(null) }
+    // Whether the comment composer bottom sheet is open.
+    var showComposer by remember { mutableStateOf(false) }
 
     Card(
         onClick = {
@@ -151,11 +162,20 @@ fun ArticleCard(
                 // Comments section appears when the comment button is toggled on.
                 if (showComments) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
+                    // Tapping this bar opens the composer for a new top-level comment.
+                    AddCommentBar(onClick = {
+                        replyingTo = null
+                        showComposer = true
+                    })
                     CommentsSection(
                         comments = comments,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        // Reply opens the same composer, pre-targeted at this comment.
+                        onReply = {
+                            replyingTo = it
+                            showComposer = true
+                        },
                     )
-                    CommentComposer(onSendComment = onSendComment)
                 }
             }
         }
@@ -165,6 +185,21 @@ fun ArticleCard(
         ShareSheet(
             article = article,
             onDismiss = { showShareSheet = false },
+        )
+    }
+
+    if (showComposer) {
+        CommentComposerSheet(
+            replyingTo = replyingTo,
+            onDismiss = {
+                showComposer = false
+                replyingTo = null
+            },
+            onSend = { text ->
+                onSendComment(text, replyingTo?.id)
+                showComposer = false
+                replyingTo = null
+            },
         )
     }
 }
@@ -224,46 +259,94 @@ private fun ActionRow(
     }
 }
 
-/** The "write a new comment" input row. Comment display lives in CommentsSection.kt. */
+/** A tappable bar that mimics a text field; opens the composer sheet for a new comment. */
 @Composable
-private fun CommentComposer(
-    onSendComment: (String) -> Unit,
-) {
-    Column(
+private fun AddCommentBar(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(percent = 50),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Text(
+            text = "Add a comment…",
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        )
+    }
+}
+
+/**
+ * Bottom-sheet comment composer. Rises from the bottom over a scrim; tapping the scrim or
+ * dragging it down dismisses it (without collapsing the article). Shows a "Reply to {username}"
+ * label when replying. Auto-focuses the field so the keyboard opens with it.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CommentComposerSheet(
+    replyingTo: CommentUi?,
+    onDismiss: () -> Unit,
+    onSend: (String) -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
     ) {
         var draft by remember { mutableStateOf("") }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = draft,
-                onValueChange = { draft = it },
-                placeholder = { Text("Add a comment…") },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                shape = RoundedCornerShape(percent = 50),   // capsule
+        val focusRequester = remember { FocusRequester() }
+        LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 16.dp)
+                .imePadding(),
+        ) {
+            Text(
+                text = if (replyingTo == null) "Add a comment" else "Reply to ${replyingTo.username}",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 8.dp),
             )
-            IconButton(
-                onClick = {
-                    if (draft.isNotBlank()) {
-                        onSendComment(draft.trim())
-                        draft = ""
-                    }
-                },
-            ) {
-                Box(
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    placeholder = { Text(if (replyingTo == null) "Add a comment…" else "Write a reply…") },
                     modifier = Modifier
-                        .size(40.dp)
-                        .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
-                    contentAlignment = Alignment.Center,
+                        .weight(1f)
+                        .focusRequester(focusRequester),
+                    shape = RoundedCornerShape(percent = 50),
+                )
+                IconButton(
+                    onClick = {
+                        if (draft.isNotBlank()) {
+                            onSend(draft.trim())
+                            draft = ""
+                        }
+                    },
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_reply),
-                        contentDescription = "Send comment",
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.size(20.dp),
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_reply),
+                            contentDescription = "Send comment",
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
             }
         }

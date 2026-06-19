@@ -129,7 +129,7 @@ fun CommentsSection(
             )
         } else {
             comments.forEach { comment ->
-                CommentItem(comment = comment, onReply = onReply)
+                CommentItem(comment = comment, depth = 0, onReply = onReply)
             }
         }
     }
@@ -140,96 +140,110 @@ fun CommentsSection(
  * so the parentID hierarchy renders to any depth. Replies start hidden behind a "show replies"
  * toggle.
  */
+/** How many levels deep replies keep indenting before they stop and continue flush. */
+private const val MAX_INDENT_DEPTH = 5
+
+/** Horizontal indent added per nesting level (on top of the thin thread line). */
+private val INDENT_STEP = 12.dp
+
 @Composable
 private fun CommentItem(
     comment: CommentUi,
+    depth: Int,
     onReply: (CommentUi) -> Unit,
 ) {
     var repliesShown by remember { mutableStateOf(false) }
 
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        CommentAvatar(username = comment.username, avatarUrl = comment.avatarUrl)
-        Spacer(Modifier.width(8.dp))
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // The comment itself: avatar + content.
+        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+            CommentAvatar(username = comment.username, avatarUrl = comment.avatarUrl)
+            Spacer(Modifier.width(8.dp))
 
-        Column(modifier = Modifier.weight(1f)) {
-            // Header: username · timestamp
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = comment.username,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = " · ${comment.timestamp}",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            // Body
-            Text(
-                text = comment.text,
-                fontSize = 15.sp,
-                lineHeight = 20.sp,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-
-            // Actions row — only Reply for now; add like/share/award here later.
-            Row(
-                modifier = Modifier.padding(top = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CommentAction(
-                    iconRes = R.drawable.ic_reply,
-                    label = "Reply",
-                    onClick = { onReply(comment) },
-                )
-            }
-
-            // Show / hide replies toggle + the nested thread.
-            if (comment.replies.isNotEmpty()) {
-                val count = comment.replies.size
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .clickable { repliesShown = !repliesShown }
-                        .padding(horizontal = 6.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = if (repliesShown) Icons.Default.KeyboardArrowUp
-                        else Icons.Default.KeyboardArrowDown,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(2.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                // Header: username · timestamp
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = if (repliesShown) "Hide replies"
-                        else "Show $count ${if (count == 1) "reply" else "replies"}",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary,
+                        text = comment.username,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = " · ${comment.timestamp}",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
 
-                if (repliesShown) {
-                    Row(modifier = Modifier.height(IntrinsicSize.Min).padding(top = 2.dp)) {
-                        // Vertical thread line spanning the nested replies.
-                        Box(
-                            modifier = Modifier
-                                .width(1.5.dp)
-                                .fillMaxHeight()
-                                .background(MaterialTheme.colorScheme.outlineVariant),
+                // Body
+                Text(
+                    text = comment.text,
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+
+                // Actions row — only Reply for now; add like/share/award here later.
+                Row(
+                    modifier = Modifier.padding(top = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CommentAction(
+                        iconRes = R.drawable.ic_reply,
+                        label = "Reply",
+                        onClick = { onReply(comment) },
+                    )
+                }
+
+                // Show / hide replies toggle.
+                if (comment.replies.isNotEmpty()) {
+                    val count = comment.replies.size
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .clickable { repliesShown = !repliesShown }
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = if (repliesShown) Icons.Default.KeyboardArrowUp
+                            else Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp),
                         )
-                        Spacer(Modifier.width(8.dp))
-                        Column {
-                            comment.replies.forEach { reply ->
-                                CommentItem(comment = reply, onReply = onReply)
-                            }
-                        }
+                        Spacer(Modifier.width(2.dp))
+                        Text(
+                            text = if (repliesShown) "Hide replies"
+                            else "Show $count ${if (count == 1) "reply" else "replies"}",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
+        }
+
+        // Nested replies render below, indented one step (with a thread line) per level — until
+        // we hit MAX_INDENT_DEPTH, after which deeper replies stop indenting and continue flush
+        // (like Reddit), so very deep threads don't march off the right edge.
+        if (comment.replies.isNotEmpty() && repliesShown) {
+            Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+                if (depth < MAX_INDENT_DEPTH) {
+                    Box(
+                        modifier = Modifier
+                            .width(1.5.dp)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.outlineVariant),
+                    )
+                    Spacer(Modifier.width(INDENT_STEP))
+                }
+                Column {
+                    comment.replies.forEach { reply ->
+                        CommentItem(comment = reply, depth = depth + 1, onReply = onReply)
                     }
                 }
             }

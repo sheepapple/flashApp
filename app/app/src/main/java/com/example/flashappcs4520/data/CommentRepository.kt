@@ -29,21 +29,23 @@ class CommentRepository {
                 .decodeList<Comment>()
         }
 
-    /** Only the columns we set; id/created_at use their DB defaults. */
+    /** Only the columns we set; id/created_at use their DB defaults. parentID is null for a
+     *  top-level comment, or the id of the comment being replied to. */
     @Serializable
     private data class CommentInsert(
         @SerialName("articleID") val articleId: Long,
         @SerialName("userID") val userId: String,
         val text: String,
+        @SerialName("parentID") val parentId: String? = null,
     )
 
-    /** Inserts one comment as the current user. */
-    suspend fun addComment(articleID: Long, text: String) =
+    /** Inserts a comment (or a reply, if [parentId] is set) as the current user. */
+    suspend fun addComment(articleID: Long, text: String, parentId: String? = null) =
         withContext(Dispatchers.IO) {
             val uid = SupabaseProvider.client.auth.currentUserOrNull()?.id
                 ?: throw IllegalStateException("No authenticated user")
             SupabaseProvider.client
                 .from("comments")
-                .insert(CommentInsert(articleID, uid, text))
+                .insert(CommentInsert(articleID, uid, text, parentId))
         }
 }
