@@ -64,6 +64,10 @@ fun FeedScreen(
         onBackClick = onLogoutClick,
         onLikeToggle = { article -> article.id?.let { articleViewModel.toggleLike(it) } },
         onSaveToggle = { article -> article.id?.let { articleViewModel.toggleSave(it) } },
+        onSendComment = { article, text, parentId ->
+            article.id?.let { articleViewModel.addComment(it, text, parentId) }
+        },
+        onCommentOpen = { article -> article.id?.let { articleViewModel.loadComments(it) } },
     )
 }
 
@@ -78,6 +82,8 @@ fun FeedContent(
     onProfileClick: () -> Unit = {},
     onLikeToggle: (Article) -> Unit = {},
     onSaveToggle: (Article) -> Unit = {},
+    onSendComment: (Article, String, String?) -> Unit = { _, _, _ -> },
+    onCommentOpen: (Article) -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -195,6 +201,10 @@ fun FeedContent(
                                 onLikeToggle = { onLikeToggle(article) },
                                 saved = article.id != null && article.id in state.savedByMe,
                                 onSaveToggle = { onSaveToggle(article) },
+                                comments = article.id?.let { state.comments[it] } ?: emptyList(),
+                                onComment = { onCommentOpen(article) },
+                                commentCount = article.id?.let { state.commentCounts[it] } ?: 0,
+                                onSendComment = { text, parentId -> onSendComment(article, text, parentId) },
                                 onClick = { onArticleClick(article) },
                             )
                         }

@@ -1,11 +1,14 @@
 package com.example.flashappcs4520.data
 
 import com.example.flashappcs4520.common.Comment
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * 1. What: Reads/writes comments for an article in the Supabase `comments` table.
@@ -19,21 +22,46 @@ class CommentRepository {
         withContext(Dispatchers.IO) {
             SupabaseProvider.client
                 .from("comments")
-                .select(Columns.list("id", "created_at", "articleID", "userID", "text")) {
+                .select(Columns.list("id", "created_at", "articleID", "userID", "text", "parentID")) {
                     filter { eq("articleID", articleID) }
                     order("created_at", Order.ASCENDING)
                 }
                 .decodeList<Comment>()
         }
 
-    /**
-     * No-op for now. Saving comments needs user authentication, which isn't set up yet.
-     * Before this can be implemented:
-     *   1. Add Supabase Auth (login) so there is a signed-in user.
-     *   2. Set the `userID` column default to `auth.uid()` and add an INSERT RLS policy.
-     *   3. Then insert { articleID, text } here (the DB stamps userID from the session).
-     */
-    suspend fun addComment(articleID: Long, text: String) {
-        // intentionally empty — see KDoc above
-    }
+    /** Total comment count per article (replies included), for the feed badge. One lightweight
+     *  query (just the articleID column), grouped client-side. */
+    suspend fun fetchCommentCounts(articleIDs: List<Long>): Map<Long, Int> =
+        withContext(Dispatchers.IO) {
+            if (articleIDs.isEmpty()) return@withContext emptyMap()
+            SupabaseProvider.client
+                .from("comments")
+                .select(Columns.list("articleID")) {
+                    filter { isIn("articleID", articleIDs) }
+                }
+                .decodeList<Comment>()
+                .mapNotNull { it.articleId }
+                .groupingBy { it }
+                .eachCount()
+        }
+
+    /** Only the columns we set; id/created_at use their DB defaults. parentID is null for a
+     *  top-level comment, or the id of the comment being replied to. */
+    @Serializable
+    private data class CommentInsert(
+        @SerialName("articleID") val articleId: Long,
+        @SerialName("userID") val userId: String,
+        val text: String,
+        @SerialName("parentID") val parentId: String? = null,
+    )
+
+    /** Inserts a comment (or a reply, if [parentId] is set) as the current user. */
+    suspend fun addComment(articleID: Long, text: String, parentId: String? = null) =
+        withContext(Dispatchers.IO) {
+            val uid = SupabaseProvider.client.auth.currentUserOrNull()?.id
+                ?: throw IllegalStateException("No authenticated user")
+            SupabaseProvider.client
+                .from("comments")
+                .insert(CommentInsert(articleID, uid, text, parentId))
+        }
 }

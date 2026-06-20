@@ -2,16 +2,12 @@ package com.example.flashappcs4520.ui
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -19,7 +15,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,7 +28,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -41,7 +35,6 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.flashappcs4520.R
 import com.example.flashappcs4520.common.Article
-import com.example.flashappcs4520.common.Comment
 import com.example.flashappcs4520.ui.theme.FlashAppCS4520Theme
 import java.net.URI
 
@@ -55,15 +48,17 @@ fun ArticleCard(
     onSaveToggle: () -> Unit = {},
     onClick: () -> Unit = {},
     onComment: () -> Unit = {},
+    commentCount: Int = 0,
     onShare: () -> Unit = {},
-    comments: List<Comment> = emptyList(),
-    onSendComment: (String) -> Unit = {},
+    comments: List<CommentUi> = emptyList(),
+    onSendComment: (text: String, parentId: String?) -> Unit = { _, _ -> },
     initiallyExpanded: Boolean = false,
     initiallyShowComments: Boolean = false,
 ) {
     var expanded by remember { mutableStateOf(initiallyExpanded) }
-    var showComments by remember { mutableStateOf(initiallyShowComments) }
     var showShareSheet by remember { mutableStateOf(false) }
+    // Whether the comments bottom sheet (scrolling thread + pinned input) is open.
+    var showCommentsSheet by remember { mutableStateOf(initiallyShowComments) }
 
     Card(
         onClick = {
@@ -139,9 +134,10 @@ fun ArticleCard(
                     likeCount = likeCount,
                     onLikeToggle = onLikeToggle,
                     onComment = {
-                        showComments = !showComments
+                        showCommentsSheet = true
                         onComment()
                     },
+                    commentCount = commentCount,
                     onShare = {
                         showShareSheet = true
                         onShare()
@@ -149,14 +145,6 @@ fun ArticleCard(
                     saved = saved,
                     onSaveToggle = onSaveToggle,
                 )
-
-                // Comments section appears when the comment button is toggled on.
-                if (showComments) {
-                    CommentsSection(
-                        comments = comments,
-                        onSendComment = onSendComment,
-                    )
-                }
             }
         }
     }
@@ -167,6 +155,14 @@ fun ArticleCard(
             onDismiss = { showShareSheet = false },
         )
     }
+
+    if (showCommentsSheet) {
+        CommentsSheet(
+            comments = comments,
+            onDismiss = { showCommentsSheet = false },
+            onSendComment = onSendComment,
+        )
+    }
 }
 
 @Composable
@@ -175,6 +171,7 @@ private fun ActionRow(
     likeCount: Int,
     onLikeToggle: () -> Unit,
     onComment: () -> Unit,
+    commentCount: Int,
     onShare: () -> Unit,
     saved: Boolean,
     onSaveToggle: () -> Unit,
@@ -207,8 +204,18 @@ private fun ActionRow(
                 )
             }
         }
-        IconButton(onClick = onComment) {
-            Icon(painterResource(R.drawable.ic_comment), contentDescription = "Comment", tint = iconTint)
+        // Comment button + total count.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onComment) {
+                Icon(painterResource(R.drawable.ic_comment), contentDescription = "Comment", tint = iconTint)
+            }
+            if (commentCount > 0) {
+                Text(
+                    text = "$commentCount",
+                    fontSize = 14.sp,
+                    color = iconTint,
+                )
+            }
         }
         IconButton(onClick = onShare) {
             Icon(painterResource(R.drawable.ic_share), contentDescription = "Share", tint = iconTint)
@@ -220,77 +227,6 @@ private fun ActionRow(
                 // ic_bookmarked is already blue; leave it untinted so its own color shows.
                 tint = if (saved) Color.Unspecified else iconTint,
             )
-        }
-    }
-}
-
-@Composable
-private fun CommentsSection(
-    comments: List<Comment>,
-    onSendComment: (String) -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
-
-        if (comments.isEmpty()) {
-            Text(
-                text = "No comments yet",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
-            )
-        } else {
-            comments.forEach { comment ->
-                Text(
-                    text = comment.text,
-                    fontSize = 15.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(vertical = 2.dp),
-                )
-            }
-        }
-
-        // Message box + send button (no-op for now; wired to onSendComment).
-        var draft by remember { mutableStateOf("") }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = draft,
-                onValueChange = { draft = it },
-                placeholder = { Text("Add a comment…") },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                shape = RoundedCornerShape(percent = 50),   // capsule
-            )
-            IconButton(
-                onClick = {
-                    if (draft.isNotBlank()) {
-                        onSendComment(draft.trim())
-                        draft = ""
-                    }
-                },
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_reply),
-                        contentDescription = "Send comment",
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
         }
     }
 }

@@ -1,12 +1,15 @@
 package com.example.flashappcs4520.ui
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.flashappcs4520.common.Article
 import com.example.flashappcs4520.data.ArticleRepository
 import com.example.flashappcs4520.data.AuthRepository
+import com.example.flashappcs4520.data.CommentRepository
 import com.example.flashappcs4520.data.LikeRepository
 import com.example.flashappcs4520.data.SaveRepository
+import com.example.flashappcs4520.data.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +27,9 @@ data class ArticleFeedState(
     val likeCounts: Map<Long, Int> = emptyMap(),
     val likedByMe: Set<Long> = emptySet(),
     val savedByMe: Set<Long> = emptySet(),
+    val comments: Map<Long, List<CommentUi>> = emptyMap(),
+    /** Total comment count per article id, for the feed badge. */
+    val commentCounts: Map<Long, Int> = emptyMap(),
     val error: String? = null,
 )
 
@@ -31,6 +37,8 @@ class ArticleViewModel(
     private val repository: ArticleRepository = ArticleRepository(),
     private val likeRepository: LikeRepository = LikeRepository(),
     private val saveRepository: SaveRepository = SaveRepository(),
+    private val commentRepository: CommentRepository = CommentRepository(),
+    private val userRepository: UserRepository = UserRepository(),
     private val authRepository: AuthRepository = AuthRepository(),
 ) : ViewModel() {
 
@@ -49,6 +57,7 @@ class ArticleViewModel(
                 _state.update { it.copy(isLoading = false, articles = articles) }
                 loadLikes(articles)
                 loadSaves()
+                loadCommentCounts(articles)
             } catch (e: Exception) {
                 _state.update {
                     it.copy(isLoading = false, error = e.message ?: "Failed to load articles")
@@ -132,6 +141,50 @@ class ArticleViewModel(
             if (s.savedByMe.contains(articleId) == saved) return@update s   // no change
             val mine = s.savedByMe.toMutableSet().apply { if (saved) add(articleId) else remove(articleId) }
             s.copy(savedByMe = mine)
+        }
+    }
+
+    /** Fetches an article's comments + author profiles, maps them to a UI tree, and stores it. */
+    fun loadComments(articleId: Long) {
+        viewModelScope.launch { refreshComments(articleId) }
+    }
+
+    /** Posts a comment (or a reply, if [parentId] is set), then refreshes the thread. */
+    fun addComment(articleId: Long, text: String, parentId: String? = null) {
+        viewModelScope.launch {
+            try {
+                commentRepository.addComment(articleId, text, parentId)
+                refreshComments(articleId)
+            } catch (e: Exception) {
+                Log.e("Comments", "Failed to post comment on article $articleId", e)
+            }
+        }
+    }
+
+    /** Loads an article's comments + profiles, maps to the UI tree, and updates state.
+     *  Also refreshes the badge count from the fetched rows so posting updates it immediately. */
+    private suspend fun refreshComments(articleId: Long) {
+        try {
+            val rows = commentRepository.fetchComments(articleId)
+            val profiles = userRepository.fetchProfiles(rows.mapNotNull { it.userId })
+            _state.update {
+                it.copy(
+                    comments = it.comments + (articleId to buildCommentUiTree(rows, profiles)),
+                    commentCounts = it.commentCounts + (articleId to rows.size),
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("Comments", "Failed to load comments for article $articleId", e)
+        }
+    }
+
+    /** Loads total comment counts for the feed's articles (for the badge), in one query. */
+    private suspend fun loadCommentCounts(articles: List<Article>) {
+        try {
+            val counts = commentRepository.fetchCommentCounts(articles.mapNotNull { it.id })
+            _state.update { it.copy(commentCounts = counts) }
+        } catch (_: Exception) {
+            // leave counts empty; the feed already rendered.
         }
     }
 }

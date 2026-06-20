@@ -1,9 +1,11 @@
 package com.example.flashappcs4520.data
 
 import android.util.Log
+import com.example.flashappcs4520.common.Profile
 import com.example.flashappcs4520.ui.User
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -64,6 +66,20 @@ class UserRepository {
                 .update({ set("profilepicture_url", url) }) {
                     filter { eq("id", uid) }
                 }
+        }
+
+    /** Looks up public profiles (username + avatar) for a set of user ids in one query,
+     *  keyed by id. Reads the `public_profiles` view, so it works for any user, not just self. */
+    suspend fun fetchProfiles(userIds: List<String>): Map<String, Profile> =
+        withContext(Dispatchers.IO) {
+            if (userIds.isEmpty()) return@withContext emptyMap()
+            SupabaseProvider.client
+                .from("public_profiles")
+                .select(Columns.list("id", "username", "profilepicture_url")) {
+                    filter { isIn("id", userIds.distinct()) }
+                }
+                .decodeList<Profile>()
+                .associateBy { it.id }
         }
 
     // calls Supabase auth.updateUser to update the new password
