@@ -64,6 +64,7 @@ fun ProfileScreen(
     userName: String = "username",
     avatarUrl: String? = null,
     interests: List<String> = emptyList(),
+    hasUnread: Boolean = false,
     onBackClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
@@ -97,7 +98,7 @@ fun ProfileScreen(
                         modifier = Modifier
                     )
                     NotificationsButton(
-                        hasUnread = true, // replace with info from viewmodel
+                        hasUnread = hasUnread,
                         onClick = onNotificationsClick,
                         modifier = Modifier.padding(end = 8.dp)
                     )
