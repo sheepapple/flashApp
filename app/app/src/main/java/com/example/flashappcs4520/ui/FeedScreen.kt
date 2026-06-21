@@ -53,14 +53,18 @@ import com.example.flashappcs4520.ui.theme.FlashAppCS4520Theme
 fun FeedScreen(
     articleViewModel: ArticleViewModel,
     avatarUrl: String? = null,
+    hasUnread: Boolean = false,
     onProfileClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
 ) {
     val state by articleViewModel.state.collectAsStateWithLifecycle()
     FeedContent(
         state = state,
         avatarUrl = avatarUrl,
+        hasUnread = hasUnread,
         onProfileClick = onProfileClick,
+        onNotificationsClick = onNotificationsClick,
         onBackClick = onLogoutClick,
         onLikeToggle = { article -> article.id?.let { articleViewModel.toggleLike(it) } },
         onSaveToggle = { article -> article.id?.let { articleViewModel.toggleSave(it) } },
@@ -79,9 +83,11 @@ fun FeedScreen(
 fun FeedContent(
     state: ArticleFeedState,
     avatarUrl: String? = null,
+    hasUnread: Boolean = false,
     onArticleClick: (Article) -> Unit = {},
     onBackClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
     onLikeToggle: (Article) -> Unit = {},
     onSaveToggle: (Article) -> Unit = {},
     onSendComment: (Article, String, String?) -> Unit = { _, _, _ -> },
@@ -145,10 +151,7 @@ fun FeedContent(
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = onProfileClick,
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
+                    IconButton(onClick = onProfileClick) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -178,6 +181,11 @@ fun FeedContent(
                             }
                         }
                     }
+                    NotificationsButton(
+                        hasUnread = hasUnread,
+                        onClick = onNotificationsClick,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,

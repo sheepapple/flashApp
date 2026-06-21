@@ -57,10 +57,14 @@ class MainActivity : ComponentActivity() {
                         val articleViewModel: ArticleViewModel = viewModel()
                         val profileViewModel: ProfileViewModel = viewModel()
                         val user by profileViewModel.user.collectAsStateWithLifecycle()
+                        val notificationViewModel: NotificationViewModel = viewModel()
+                        val hasUnread by notificationViewModel.hasUnread.collectAsStateWithLifecycle()
                         FeedScreen(
                             articleViewModel = articleViewModel,
                             avatarUrl = user?.avatarUrl,
+                            hasUnread = hasUnread,
                             onProfileClick = { screen = "profile" },
+                            onNotificationsClick = { screen = "notifications" },
                             // Sign out and return to the welcome (home) screen.
                             onLogoutClick = {
                                 scope.launch { auth.signOut() }
