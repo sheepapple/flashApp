@@ -1,5 +1,7 @@
 package com.example.flashappcs4520.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
@@ -12,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -20,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,6 +71,7 @@ fun ArticleCard(
     highlightedCommentId: String? = null,
     highlighted: Boolean = false,
 ) {
+    val context = LocalContext.current
     var expanded by remember { mutableStateOf(initiallyExpanded) }
     // A deep link can focus an article that's already on screen (its card is reused, so its
     // remembered state survives the reorder). Expand it when focus flips it on.
@@ -107,6 +114,8 @@ fun ArticleCard(
         animationSpec = tween(durationMillis = 700),
         label = "cardHighlightWidth",
     )
+    // Confirmation dialog before leaving the app for the publisher's site.
+    var showOpenDialog by remember { mutableStateOf(false) }
 
     Card(
         onClick = {
@@ -177,7 +186,22 @@ fun ArticleCard(
 
             // Action buttons appear only when expanded.
             if (expanded) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
+                // Full-width pill linking out to the publisher's site (Guardian).
+                Button(
+                    onClick = { showOpenDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    shape = RoundedCornerShape(50),
+                ) {
+                    Text(text = "Read the full article")
+                }
+
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
                 ActionRow(
                     liked = liked,
                     likeCount = likeCount,
@@ -214,6 +238,28 @@ fun ArticleCard(
                 commentHighlight = null
             },
             onSendComment = onSendComment,
+        )
+    }
+
+    if (showOpenDialog) {
+        AlertDialog(
+            onDismissRequest = { showOpenDialog = false },
+            title = { Text("Leave Flash?") },
+            text = { Text("This will open the full article on the publisher's site in your browser.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showOpenDialog = false
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(article.webUrl))
+                    runCatching { context.startActivity(intent) }
+                }) {
+                    Text("Continue")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showOpenDialog = false }) {
+                    Text("Cancel")
+                }
+            },
         )
     }
 }
