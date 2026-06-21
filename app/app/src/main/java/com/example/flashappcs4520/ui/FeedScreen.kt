@@ -2,7 +2,6 @@ package com.example.flashappcs4520.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,11 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
@@ -216,34 +211,20 @@ fun FeedContent(
                 }
 
                 else -> {
-                    LazyColumn(
+                    ArticleList(
+                        state = state,
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 16.dp)
                             .padding(top = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(
-                            items = state.articles,
-                            key = { article -> article.webUrl }
-                        ) { article ->
-                            ArticleCard(
-                                article = article,
-                                liked = article.id != null && article.id in state.likedByMe,
-                                likeCount = article.id?.let { state.likeCounts[it] } ?: 0,
-                                onLikeToggle = { onLikeToggle(article) },
-                                saved = article.id != null && article.id in state.savedByMe,
-                                onSaveToggle = { onSaveToggle(article) },
-                                comments = article.id?.let { state.comments[it] } ?: emptyList(),
-                                onComment = { onCommentOpen(article) },
-                                commentCount = article.id?.let { state.commentCounts[it] } ?: 0,
-                                onSendComment = { text, parentId -> onSendComment(article, text, parentId) },
-                                onClick = { onArticleClick(article) },
-                                onExpand = { onExpand(article) },
-                                onShare = { onShare(article) },
-                            )
-                        }
-                    }
+                        onArticleClick = onArticleClick,
+                        onLikeToggle = onLikeToggle,
+                        onSaveToggle = onSaveToggle,
+                        onSendComment = onSendComment,
+                        onCommentOpen = onCommentOpen,
+                        onExpand = onExpand,
+                        onShare = onShare,
+                    )
                 }
             }
         }

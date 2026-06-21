@@ -1,5 +1,6 @@
 package com.example.flashappcs4520.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -59,6 +60,7 @@ import androidx.compose.ui.graphics.Color
 @Composable
 fun NotificationsScreen(
     onBackClick: () -> Unit,
+    onNotificationClick: (Notification) -> Unit = {},
     viewModel: NotificationViewModel = viewModel(),
 ) {
     val notifications by viewModel.notifications.collectAsStateWithLifecycle()
@@ -119,14 +121,14 @@ fun NotificationsScreen(
                     if (today.isNotEmpty()) {
                         item { SectionHeader("Today") }
                         items(today) { notif ->
-                            NotificationRow(notif)
+                            NotificationRow(notif, onClick = { onNotificationClick(notif) })
                             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                         }
                     }
                     if (earlier.isNotEmpty()) {
                         item { SectionHeader("Earlier") }
                         items(earlier) { notif ->
-                            NotificationRow(notif)
+                            NotificationRow(notif, onClick = { onNotificationClick(notif) })
                             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                         }
                     }
@@ -148,11 +150,17 @@ private fun SectionHeader(title: String) {
 }
 
 @Composable
-private fun NotificationRow(notification: Notification) {
+private fun NotificationRow(
+    notification: Notification,
+    onClick: () -> Unit = {},
+) {
+    // Tappable only when it points at an article; a null articleID row just isn't clickable.
+    val rowModifier = Modifier
+        .fillMaxWidth()
+        .let { if (notification.articleId != null) it.clickable(onClick = onClick) else it }
+        .padding(horizontal = 16.dp, vertical = 12.dp)
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = rowModifier,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // red dot visible only for unread

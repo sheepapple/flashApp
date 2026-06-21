@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +58,11 @@ fun ArticleCard(
     onExpand: () -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(initiallyExpanded) }
+    // A deep link can focus an article that's already on screen (its card is reused, so its
+    // remembered state survives the reorder). Expand it when focus flips it on.
+    LaunchedEffect(initiallyExpanded) {
+        if (initiallyExpanded) expanded = true
+    }
     var showShareSheet by remember { mutableStateOf(false) }
     // Whether the comments bottom sheet (scrolling thread + pinned input) is open.
     var showCommentsSheet by remember { mutableStateOf(initiallyShowComments) }

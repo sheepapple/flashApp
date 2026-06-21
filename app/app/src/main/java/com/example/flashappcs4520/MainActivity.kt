@@ -25,6 +25,7 @@ import com.example.flashappcs4520.ui.SettingScreen
 import com.example.flashappcs4520.ui.SettingViewModel
 import com.example.flashappcs4520.ui.NotificationsScreen
 import com.example.flashappcs4520.ui.NotificationViewModel
+import com.example.flashappcs4520.ui.SavedScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -104,12 +105,21 @@ class MainActivity : ComponentActivity() {
                     }
                     "notifications" -> {
                         val notificationViewModel: NotificationViewModel = viewModel()
+                        // Same activity-scoped instance the feed renders, so a tapped
+                        // notification can prepend its article to that feed.
+                        val articleViewModel: ArticleViewModel = viewModel()
                         NotificationsScreen(
                             onBackClick = { screen = "profile" },
+                            onNotificationClick = { notification ->
+                                notification.articleId?.let { id ->
+                                    articleViewModel.prependArticleToFeed(id)
+                                    screen = "feed"
+                                }
+                            },
                             viewModel = notificationViewModel,
                         )
                     }
-                    "saved" -> {}
+                    "saved" -> SavedScreen(onBackClick = { screen = "profile" })
                     "comments" -> {}
                 }
             }
