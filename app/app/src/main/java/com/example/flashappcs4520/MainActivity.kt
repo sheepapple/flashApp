@@ -19,6 +19,8 @@ import com.example.flashappcs4520.ui.SignUpScreen
 import com.example.flashappcs4520.ui.theme.FlashAppCS4520Theme
 import com.example.flashappcs4520.ui.SettingScreen
 import com.example.flashappcs4520.ui.SettingViewModel
+import com.example.flashappcs4520.ui.NotificationsScreen
+import com.example.flashappcs4520.ui.NotificationViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,10 +54,13 @@ class MainActivity : ComponentActivity() {
                     "profile" -> {
                         val profileViewModel: ProfileViewModel = viewModel()
                         val user by profileViewModel.user.collectAsStateWithLifecycle()
+                        val notificationViewModel: NotificationViewModel = viewModel()
+                        val hasUnread by notificationViewModel.hasUnread.collectAsStateWithLifecycle()
                         ProfileScreen(
                             userName = user?.username ?: "Loading…",
                             avatarUrl = user?.avatarUrl,
                             interests = user?.interests ?: emptyList(),
+                            hasUnread = hasUnread,
                             onBackClick = { screen = "feed" },
                             onSettingsClick = { screen = "settings" },
                             onNotificationsClick = { screen = "notifications" },
@@ -81,7 +86,13 @@ class MainActivity : ComponentActivity() {
                             viewModel = settingsViewModel,
                         )
                     }
-                    "notifications" -> {} // TODO notifications screen
+                    "notifications" -> {
+                        val notificationViewModel: NotificationViewModel = viewModel()
+                        NotificationsScreen(
+                            onBackClick = { screen = "profile" },
+                            viewModel = notificationViewModel,
+                        )
+                    }
                     "saved" -> {}
                     "comments" -> {}
                 }

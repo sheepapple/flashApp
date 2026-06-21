@@ -55,13 +55,36 @@ class CommentRepository {
         @SerialName("parentID") val parentId: String? = null,
     )
 
-    /** Inserts a comment (or a reply, if [parentId] is set) as the current user. */
+
+    // inserts a comment or a reply
     suspend fun addComment(articleID: Long, text: String, parentId: String? = null) =
         withContext(Dispatchers.IO) {
             val uid = SupabaseProvider.client.auth.currentUserOrNull()?.id
                 ?: throw IllegalStateException("No authenticated user")
+
             SupabaseProvider.client
                 .from("comments")
                 .insert(CommentInsert(articleID, uid, text, parentId))
+
+            // if this is a reply, notify the original commenter
+            if (parentId != null) {
+                val parentComment = SupabaseProvider.client
+                    .from("comments")
+                    .select(Columns.list("userID")) {
+                        filter { eq("id", parentId) }
+                    }
+                    .decodeList<Comment>()
+                    .firstOrNull()
+
+                val parentAuthorId = parentComment?.userId
+                if (parentAuthorId != null && parentAuthorId != uid) {
+                    NotificationRepository().insertNotification(
+                        targetUserId = parentAuthorId,
+                        articleId = articleID,
+                        text = "Someone replied to your comment",
+                        type = "reply",
+                    )
+                }
+            }
         }
 }
