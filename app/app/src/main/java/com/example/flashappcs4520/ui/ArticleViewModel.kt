@@ -31,6 +31,10 @@ data class ArticleFeedState(
     val savedByMe: Set<Long> = emptySet(),
     val comments: Map<Long, List<CommentUi>> = emptyMap(),
     val commentCounts: Map<Long, Int> = emptyMap(),
+    // Article a deep link landed on: the list auto-expands it and scrolls to the top.
+    val focusedArticleId: Long? = null,
+    // Comment a deep link (a reply notification) wants to open + scroll to + highlight.
+    val focusedCommentId: String? = null,
     val error: String? = null,
 )
 
@@ -42,13 +46,16 @@ class ArticleViewModel(
     private val userRepository: UserRepository = UserRepository(),
     private val authRepository: AuthRepository = AuthRepository(),
     private val blacklistRepository: BlacklistRepository = BlacklistRepository(),
+    // The feed instance auto-loads the feed; instances that drive other lists (e.g. the Saved
+    // screen) pass false so their own loader isn't clobbered by a feed fetch racing in init.
+    autoLoadFeed: Boolean = true,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ArticleFeedState())
     val state: StateFlow<ArticleFeedState> = _state.asStateFlow()
 
     init {
-        loadArticles()
+        if (autoLoadFeed) loadArticles()
     }
 
     fun loadArticles() {
@@ -85,6 +92,59 @@ class ArticleViewModel(
                 }
             }
         }
+    }
+
+    /**
+     * Deep-link entry point: brings [id]'s article to the top of the feed (fetching it if it
+     * isn't loaded), marks it focused so the list expands it and scrolls to the top, and
+     * refreshes engagement data. Dedupes on `webUrl` (the LazyColumn key) so the prepended
+     * card never collides with an existing copy.
+     */
+    fun prependArticleToFeed(id: Long, commentId: String? = null) {
+        viewModelScope.launch {
+            val current = _state.value.articles
+            val newList = current.find { it.id == id }?.let { existing ->
+                listOf(existing) + current.filter { it.webUrl != existing.webUrl }
+            } ?: run {
+                val fetched = try {
+                    repository.fetchArticlesByIds(listOf(id)).firstOrNull()
+                } catch (e: Exception) {
+                    Log.e("DeepLink", "Failed to fetch article $id", e); null
+                } ?: return@launch
+                listOf(fetched) + current.filter { it.webUrl != fetched.webUrl }
+            }
+            _state.update {
+                it.copy(articles = newList, focusedArticleId = id, focusedCommentId = commentId)
+            }
+            loadLikes(newList)
+            loadSaves()
+            loadCommentCounts(newList)
+            // A reply deep link opens the comments sheet, so preload the thread it'll show.
+            if (commentId != null) refreshComments(id)
+        }
+    }
+
+    /** Loads the current user's saved articles into the feed state (for the Saved screen). */
+    fun loadSavedArticles() {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null) }
+            try {
+                val ids = saveRepository.fetchMySavedArticleIds()
+                setArticles(repository.fetchArticlesByIds(ids))
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(isLoading = false, error = e.message ?: "Failed to load saved articles")
+                }
+            }
+        }
+    }
+
+    /** Sets [articles] and refreshes the per-article like/save/comment-count state. */
+    private suspend fun setArticles(articles: List<Article>) {
+        _state.update { it.copy(isLoading = false, articles = articles) }
+        loadLikes(articles)
+        loadSaves()
+        loadCommentCounts(articles)
     }
 
     /** Adds an article to the blacklist. Called on like, save, comment, share, or expand. */

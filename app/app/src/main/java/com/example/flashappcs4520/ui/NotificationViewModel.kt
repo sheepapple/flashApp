@@ -41,6 +41,22 @@ class NotificationViewModel(
         }
     }
 
+    /** Marks one notification read — used when the user taps it to follow its deep link. */
+    fun markRead(notificationId: String?) {
+        if (notificationId == null) return
+        viewModelScope.launch {
+            try {
+                repository.markRead(notificationId)
+                _notifications.value = _notifications.value.map {
+                    if (it.id == notificationId) it.copy(isRead = true) else it
+                }
+                _hasUnread.value = _notifications.value.any { !it.isRead }
+            } catch (e: Exception) {
+                Log.e("NotificationViewModel", "Failed to mark notification read", e)
+            }
+        }
+    }
+
     fun markAllRead() {
         viewModelScope.launch {
             try {

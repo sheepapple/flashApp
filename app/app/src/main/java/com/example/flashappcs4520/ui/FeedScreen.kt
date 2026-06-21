@@ -2,7 +2,7 @@ package com.example.flashappcs4520.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,11 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
@@ -25,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,6 +55,7 @@ import com.example.flashappcs4520.ui.theme.FlashAppCS4520Theme
 fun FeedScreen(
     articleViewModel: ArticleViewModel,
     avatarUrl: String? = null,
+    hasUnread: Boolean = false,
     onProfileClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
 ) {
@@ -65,6 +63,7 @@ fun FeedScreen(
     FeedContent(
         state = state,
         avatarUrl = avatarUrl,
+        hasUnread = hasUnread,
         onProfileClick = onProfileClick,
         onBackClick = onLogoutClick,
         onLikeToggle = { article -> article.id?.let { articleViewModel.toggleLike(it) } },
@@ -84,6 +83,7 @@ fun FeedScreen(
 fun FeedContent(
     state: ArticleFeedState,
     avatarUrl: String? = null,
+    hasUnread: Boolean = false,
     onArticleClick: (Article) -> Unit = {},
     onBackClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
@@ -150,37 +150,42 @@ fun FeedContent(
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = onProfileClick,
-                        modifier = Modifier.padding(end = 8.dp)
+                    // Profile avatar + unread dot. NOT an IconButton: IconButton clips its
+                    // content to a circle, which would cut off a corner badge. We clip only the
+                    // avatar itself and overlay the unread dot in the (unclipped) corner so users
+                    // know to head to Profile to view Notifications.
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .size(40.dp),
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(
-                                    MaterialTheme.colorScheme.secondaryContainer,
-                                    CircleShape,
-                                ),
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.secondaryContainer)
+                                .clickable(onClick = onProfileClick),
                             contentAlignment = Alignment.Center,
                         ) {
                             // take profile url as change now
                             if (!avatarUrl.isNullOrBlank()) {
                                 AsyncImage(
                                     model = avatarUrl,
-                                    contentDescription = "Profile",
+                                    contentDescription = if (hasUnread) "Profile, unread notifications" else "Profile",
                                     contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(CircleShape),
+                                    modifier = Modifier.fillMaxSize(),
                                 )
                             } else {
                                 Icon(
                                     imageVector = Icons.Default.Person,
-                                    contentDescription = "Profile",
+                                    contentDescription = if (hasUnread) "Profile, unread notifications" else "Profile",
                                     tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                     modifier = Modifier.size(24.dp),
                                 )
                             }
+                        }
+                        if (hasUnread) {
+                            Badge(modifier = Modifier.align(Alignment.TopEnd).size(10.dp))
                         }
                     }
                 },
@@ -216,34 +221,20 @@ fun FeedContent(
                 }
 
                 else -> {
-                    LazyColumn(
+                    ArticleList(
+                        state = state,
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 16.dp)
                             .padding(top = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(
-                            items = state.articles,
-                            key = { article -> article.webUrl }
-                        ) { article ->
-                            ArticleCard(
-                                article = article,
-                                liked = article.id != null && article.id in state.likedByMe,
-                                likeCount = article.id?.let { state.likeCounts[it] } ?: 0,
-                                onLikeToggle = { onLikeToggle(article) },
-                                saved = article.id != null && article.id in state.savedByMe,
-                                onSaveToggle = { onSaveToggle(article) },
-                                comments = article.id?.let { state.comments[it] } ?: emptyList(),
-                                onComment = { onCommentOpen(article) },
-                                commentCount = article.id?.let { state.commentCounts[it] } ?: 0,
-                                onSendComment = { text, parentId -> onSendComment(article, text, parentId) },
-                                onClick = { onArticleClick(article) },
-                                onExpand = { onExpand(article) },
-                                onShare = { onShare(article) },
-                            )
-                        }
-                    }
+                        onArticleClick = onArticleClick,
+                        onLikeToggle = onLikeToggle,
+                        onSaveToggle = onSaveToggle,
+                        onSendComment = onSendComment,
+                        onCommentOpen = onCommentOpen,
+                        onExpand = onExpand,
+                        onShare = onShare,
+                    )
                 }
             }
         }

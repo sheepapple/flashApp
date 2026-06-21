@@ -18,16 +18,24 @@ class NotificationRepository {
         val userId: String,
         @SerialName("articleID")
         val articleId: Long?,
+        @SerialName("commentID")
+        val commentId: String?,
         val text: String,
         val type: String,
     )
 
-    // inserts a notification
-    suspend fun insertNotification(targetUserId: String, articleId: Long?, text: String, type: String) =
+    // inserts a notification; commentId points a "reply" at the exact comment to scroll to
+    suspend fun insertNotification(
+        targetUserId: String,
+        articleId: Long?,
+        text: String,
+        type: String,
+        commentId: String? = null,
+    ) =
         withContext(Dispatchers.IO) {
             client
                 .from("notifications")
-                .insert(NotificationInsert(targetUserId, articleId, text, type))
+                .insert(NotificationInsert(targetUserId, articleId, commentId, text, type))
         }
 
     private val client get() = SupabaseProvider.client
@@ -37,7 +45,7 @@ class NotificationRepository {
         val uid = client.auth.currentUserOrNull()?.id ?: return@withContext emptyList()
         client
             .from("notifications")
-            .select(Columns.list("id", "created_at", "articleID", "userID", "text", "is_read", "type")) {
+            .select(Columns.list("id", "created_at", "articleID", "commentID", "userID", "text", "is_read", "type")) {
                 filter { eq("userID", uid) }
                 order("created_at", Order.DESCENDING)
             }
@@ -57,6 +65,15 @@ class NotificationRepository {
             }
             .decodeList<Notification>()
             .isNotEmpty()
+    }
+
+    // mark a single notification as read (e.g. when the user taps it to follow its link)
+    suspend fun markRead(notificationId: String) = withContext(Dispatchers.IO) {
+        client
+            .from("notifications")
+            .update({ set("is_read", true) }) {
+                filter { eq("id", notificationId) }
+            }
     }
 
     // mark all notification as read

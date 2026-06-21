@@ -2,7 +2,10 @@ package com.example.flashappcs4520.ui
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,6 +26,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +43,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
 import com.example.flashappcs4520.R
 import com.example.flashappcs4520.common.Article
 import com.example.flashappcs4520.ui.theme.FlashAppCS4520Theme
@@ -61,12 +66,54 @@ fun ArticleCard(
     initiallyExpanded: Boolean = false,
     initiallyShowComments: Boolean = false,
     onExpand: () -> Unit = {},
+    // A reply deep link sets these: the comment to scroll to/highlight in the sheet, and a flag
+    // to briefly highlight the whole card. Both default off for normal feed rendering.
+    highlightedCommentId: String? = null,
+    highlighted: Boolean = false,
 ) {
     val context = LocalContext.current
     var expanded by remember { mutableStateOf(initiallyExpanded) }
+    // A deep link can focus an article that's already on screen (its card is reused, so its
+    // remembered state survives the reorder). Expand it when focus flips it on.
+    LaunchedEffect(initiallyExpanded) {
+        if (initiallyExpanded) expanded = true
+    }
     var showShareSheet by remember { mutableStateOf(false) }
     // Whether the comments bottom sheet (scrolling thread + pinned input) is open.
     var showCommentsSheet by remember { mutableStateOf(initiallyShowComments) }
+    // A reply deep link opens the thread. Keyed on the flag (not Unit) so it also fires when an
+    // already-on-screen card gets focused (its remembered showCommentsSheet wouldn't otherwise
+    // flip). onComment() makes sure the thread is loaded.
+    LaunchedEffect(initiallyShowComments) {
+        if (initiallyShowComments) {
+            showCommentsSheet = true
+            onComment()
+        }
+    }
+    // Comment to highlight, consumed when the sheet closes so reopening it later (via the
+    // comment button) doesn't re-highlight — the highlight lives only for this deep-link view.
+    var commentHighlight by remember(highlightedCommentId) { mutableStateOf(highlightedCommentId) }
+
+    // A deep-linked article gets a brief border highlight that fades after a moment.
+    var highlightActive by remember(highlighted) { mutableStateOf(highlighted) }
+    LaunchedEffect(highlighted) {
+        if (highlighted) {
+            highlightActive = true
+            delay(1500)
+            highlightActive = false
+        }
+    }
+    val borderColor by animateColorAsState(
+        targetValue = if (highlightActive) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.outlineVariant,
+        animationSpec = tween(durationMillis = 700),
+        label = "cardHighlightColor",
+    )
+    val borderWidth by animateDpAsState(
+        targetValue = if (highlightActive) 2.dp else 1.dp,
+        animationSpec = tween(durationMillis = 700),
+        label = "cardHighlightWidth",
+    )
     // Confirmation dialog before leaving the app for the publisher's site.
     var showOpenDialog by remember { mutableStateOf(false) }
 
@@ -81,7 +128,7 @@ fun ArticleCard(
             .animateContentSize(),   // smooth grow/shrink on expand
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = BorderStroke(borderWidth, borderColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column {
@@ -185,7 +232,11 @@ fun ArticleCard(
     if (showCommentsSheet) {
         CommentsSheet(
             comments = comments,
-            onDismiss = { showCommentsSheet = false },
+            highlightedCommentId = commentHighlight,
+            onDismiss = {
+                showCommentsSheet = false
+                commentHighlight = null
+            },
             onSendComment = onSendComment,
         )
     }

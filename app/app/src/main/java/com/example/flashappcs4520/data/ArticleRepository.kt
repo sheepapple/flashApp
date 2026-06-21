@@ -27,4 +27,17 @@ class ArticleRepository {
                 }
                 .decodeList<Article>()
         }
+
+    /** Fetches specific articles by id — backs deep links (notification → article) and the
+     *  saved-articles list. Returns whatever ids exist; an empty input short-circuits to []. */
+    suspend fun fetchArticlesByIds(ids: List<Long>): List<Article> =
+        withContext(Dispatchers.IO) {
+            if (ids.isEmpty()) return@withContext emptyList()
+            SupabaseProvider.client
+                .from("articles")
+                .select(Columns.list("id", "web_title", "summary", "image_url", "web_url", "published_at", "section")) {
+                    filter { isIn("id", ids) }
+                }
+                .decodeList<Article>()
+        }
 }
