@@ -25,6 +25,8 @@ import kotlinx.coroutines.launch
  */
 data class ArticleFeedState(
     val isLoading: Boolean = false,
+    // True while a "load more" page is being fetched (footer spinner; also guards re-entry).
+    val isLoadingMore: Boolean = false,
     val articles: List<Article> = emptyList(),
     val likeCounts: Map<Long, Int> = emptyMap(),
     val likedByMe: Set<Long> = emptySet(),
@@ -54,16 +56,41 @@ class ArticleViewModel(
     private val _state = MutableStateFlow(ArticleFeedState())
     val state: StateFlow<ArticleFeedState> = _state.asStateFlow()
 
+    // --- Pagination ---
+    // How many DB rows we've consumed so far (the next page starts here). Tracked separately
+    // from articles.size because the tier sort and webUrl dedup can change the rendered count.
+    private var dbOffset = 0L
+    // Set once the DB returns a short page: there's nothing left to load, so loadMore() no-ops.
+    private var endReached = false
+
     init {
         if (autoLoadFeed) loadArticles()
+    }
+
+    /** Orders a page of articles by the recommendation tiers:
+     *  1) followed topic, not blacklisted  2) other topic, not blacklisted
+     *  3) followed topic, blacklisted       4) other topic, blacklisted. */
+    private fun applyRecommendationTiers(
+        articles: List<Article>,
+        blacklisted: Set<Long>,
+        interests: List<String>,
+    ): List<Article> {
+        val tier1 = articles.filter { it.id !in blacklisted && it.section in interests }
+        val tier2 = articles.filter { it.id !in blacklisted && it.section !in interests }
+        val tier3 = articles.filter { it.id in blacklisted && it.section in interests }
+        val tier4 = articles.filter { it.id in blacklisted && it.section !in interests }
+        return tier1 + tier2 + tier3 + tier4
     }
 
     fun loadArticles() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
+            // Fresh load: reset pagination so the next scroll pages from the top again.
+            dbOffset = 0L
+            endReached = false
             try {
                 // fetch articles, blacklist, and user interests in parallel
-                val articlesDeferred = async { repository.fetchArticles(count = 50) }
+                val articlesDeferred = async { repository.fetchArticles(count = INITIAL_PAGE_SIZE) }
                 val blacklistDeferred = async { blacklistRepository.fetchBlacklistedIds() }
                 val interestsDeferred = async { userRepository.fetchCurrentUser()?.interests ?: emptyList() }
 
@@ -71,16 +98,10 @@ class ArticleViewModel(
                 val blacklisted = blacklistDeferred.await()
                 val interests = interestsDeferred.await()
 
-                // tier 1: matches interests, not blacklisted
-                // tier 2: no interest match, not blacklisted
-                // tier 3: matches interests, blacklisted
-                // tier 4: no interest match, blacklisted
-                val tier1 = articles.filter { it.id !in blacklisted && it.section in interests }
-                val tier2 = articles.filter { it.id !in blacklisted && it.section !in interests }
-                val tier3 = articles.filter { it.id in blacklisted && it.section in interests }
-                val tier4 = articles.filter { it.id in blacklisted && it.section !in interests }
+                dbOffset = articles.size.toLong()
+                if (articles.size < INITIAL_PAGE_SIZE) endReached = true
 
-                val sorted = tier1 + tier2 + tier3 + tier4
+                val sorted = applyRecommendationTiers(articles, blacklisted, interests)
 
                 _state.update { it.copy(isLoading = false, articles = sorted) }
                 loadLikes(sorted)
@@ -90,6 +111,41 @@ class ArticleViewModel(
                 _state.update {
                     it.copy(isLoading = false, error = e.message ?: "Failed to load articles")
                 }
+            }
+        }
+    }
+
+    /**
+     * Loads the next [PAGE_SIZE] articles from the DB and appends them, tier-sorted like the
+     * initial load. Called when the user scrolls to the bottom of the feed. No-ops while a load
+     * is already running or once the end of the table has been reached.
+     */
+    fun loadMore() {
+        val current = _state.value
+        if (current.isLoading || current.isLoadingMore || endReached) return
+        viewModelScope.launch {
+            _state.update { it.copy(isLoadingMore = true) }
+            try {
+                val articles = repository.fetchArticles(count = PAGE_SIZE, offset = dbOffset)
+                dbOffset += articles.size
+                if (articles.size < PAGE_SIZE) endReached = true
+
+                val blacklisted = blacklistRepository.fetchBlacklistedIds()
+                val interests = userRepository.fetchCurrentUser()?.interests ?: emptyList()
+                val sortedPage = applyRecommendationTiers(articles, blacklisted, interests)
+
+                // Guard against showing the same article twice (e.g. one prepended by a deep link).
+                val existingUrls = _state.value.articles.mapTo(HashSet()) { it.webUrl }
+                val newPage = sortedPage.filter { it.webUrl !in existingUrls }
+                val combined = _state.value.articles + newPage
+
+                _state.update { it.copy(isLoadingMore = false, articles = combined) }
+                loadLikes(combined)
+                loadSaves()
+                loadCommentCounts(combined)
+            } catch (e: Exception) {
+                Log.e("Feed", "Failed to load more articles", e)
+                _state.update { it.copy(isLoadingMore = false) }
             }
         }
     }
@@ -139,8 +195,10 @@ class ArticleViewModel(
         }
     }
 
-    /** Sets [articles] and refreshes the per-article like/save/comment-count state. */
+    /** Sets [articles] and refreshes the per-article like/save/comment-count state. Used by the
+     *  fixed-list screens (e.g. Saved), which aren't paginated — so block further loadMore(). */
     private suspend fun setArticles(articles: List<Article>) {
+        endReached = true
         _state.update { it.copy(isLoading = false, articles = articles) }
         loadLikes(articles)
         loadSaves()
@@ -285,5 +343,12 @@ class ArticleViewModel(
         } catch (_: Exception) {
             // leave counts empty; the feed already rendered.
         }
+    }
+
+    companion object {
+        // Articles fetched on the first load.
+        private const val INITIAL_PAGE_SIZE = 50L
+        // Articles fetched each time the user scrolls to the bottom.
+        private const val PAGE_SIZE = 10L
     }
 }

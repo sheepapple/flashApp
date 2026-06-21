@@ -17,13 +17,19 @@ import kotlinx.coroutines.withContext
  */
 class ArticleRepository {
 
-    suspend fun fetchArticles(count: Long = 10): List<Article> =
+    /**
+     * Fetches a page of articles, newest first. [offset] skips that many rows so the feed can
+     * page in more as the user scrolls. The secondary sort on `id` keeps ordering stable across
+     * pages (ties on `published_at` won't shuffle and cause gaps/duplicates between pages).
+     */
+    suspend fun fetchArticles(count: Long = 10, offset: Long = 0): List<Article> =
         withContext(Dispatchers.IO) {
             SupabaseProvider.client
                 .from("articles")
                 .select(Columns.list("id", "web_title", "summary", "image_url", "web_url", "published_at", "section")) {
                     order("published_at", Order.DESCENDING)
-                    limit(count)
+                    order("id", Order.DESCENDING)
+                    range(offset, offset + count - 1)
                 }
                 .decodeList<Article>()
         }
