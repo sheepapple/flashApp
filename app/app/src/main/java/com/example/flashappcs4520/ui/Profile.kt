@@ -108,7 +108,7 @@ fun ProfileScreen(
                 ),
             )
         },
-        containerColor = MaterialTheme.colorScheme.secondaryFixed,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) { innerPadding ->
         Column(
             modifier = Modifier
