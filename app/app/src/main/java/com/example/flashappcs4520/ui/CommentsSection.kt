@@ -1,7 +1,10 @@
 package com.example.flashappcs4520.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -40,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
@@ -58,6 +62,7 @@ import com.example.flashappcs4520.ui.theme.FlashAppCS4520Theme
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import kotlinx.coroutines.delay
 
 /**
  * UI model for one comment in a thread. Decoupled from the DB `Comment` for now: it carries
@@ -134,6 +139,7 @@ fun CommentsSection(
     comments: List<CommentUi>,
     modifier: Modifier = Modifier,
     onReply: (CommentUi) -> Unit = {},
+    highlightedCommentId: String? = null,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         if (comments.isEmpty()) {
@@ -147,11 +153,21 @@ fun CommentsSection(
             )
         } else {
             comments.forEach { comment ->
-                CommentItem(comment = comment, depth = 0, onReply = onReply)
+                CommentItem(
+                    comment = comment,
+                    depth = 0,
+                    onReply = onReply,
+                    highlightedCommentId = highlightedCommentId,
+                )
             }
         }
     }
 }
+
+/** True if [id] is this comment or any of its (transitive) replies — used to auto-expand the
+ *  reply chain leading to a deep-linked comment. */
+private fun CommentUi.containsId(id: String): Boolean =
+    this.id == id || replies.any { it.containsId(id) }
 
 /**
  * The comments "layer": a tall bottom sheet hosting the scrolling thread with the input pinned
@@ -164,6 +180,7 @@ fun CommentsSheet(
     comments: List<CommentUi>,
     onDismiss: () -> Unit,
     onSendComment: (text: String, parentId: String?) -> Unit,
+    highlightedCommentId: String? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var replyingTo by remember { mutableStateOf<CommentUi?>(null) }
@@ -195,6 +212,7 @@ fun CommentsSheet(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 onReply = { replyingTo = it },
+                highlightedCommentId = highlightedCommentId,
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
@@ -306,17 +324,41 @@ private const val MAX_INDENT_DEPTH = 5
 /** Horizontal indent added per nesting level (on top of the thin thread line). */
 private val INDENT_STEP = 12.dp
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CommentItem(
     comment: CommentUi,
     depth: Int,
     onReply: (CommentUi) -> Unit,
+    highlightedCommentId: String? = null,
 ) {
-    var repliesShown by remember { mutableStateOf(false) }
+    // Expand by default if the deep-linked comment lives in this subtree, so the chain leading
+    // to it is open; highlight the target itself and scroll it into view.
+    val containsTarget = highlightedCommentId != null && comment.containsId(highlightedCommentId)
+    val isHighlighted = comment.id == highlightedCommentId
+    var repliesShown by remember { mutableStateOf(containsTarget) }
+
+    val bringIntoView = remember { BringIntoViewRequester() }
+    LaunchedEffect(isHighlighted) {
+        if (isHighlighted) {
+            delay(350)   // let the sheet settle + thread lay out before scrolling
+            runCatching { bringIntoView.bringIntoView() }
+        }
+    }
+    val highlightBg = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
 
     Column(modifier = Modifier.fillMaxWidth()) {
         // The comment itself: avatar + content.
-        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .bringIntoViewRequester(bringIntoView)
+                .background(
+                    color = if (isHighlighted) highlightBg else Color.Transparent,
+                    shape = RoundedCornerShape(8.dp),
+                )
+                .padding(horizontal = 4.dp, vertical = 6.dp),
+        ) {
             CommentAvatar(username = comment.username, avatarUrl = comment.avatarUrl)
             Spacer(Modifier.width(8.dp))
 
@@ -403,7 +445,12 @@ private fun CommentItem(
                 }
                 Column {
                     comment.replies.forEach { reply ->
-                        CommentItem(comment = reply, depth = depth + 1, onReply = onReply)
+                        CommentItem(
+                            comment = reply,
+                            depth = depth + 1,
+                            onReply = onReply,
+                            highlightedCommentId = highlightedCommentId,
+                        )
                     }
                 }
             }

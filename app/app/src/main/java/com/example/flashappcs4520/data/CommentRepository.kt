@@ -56,17 +56,20 @@ class CommentRepository {
     )
 
 
-    // inserts a comment or a reply
+    // inserts a comment or a reply; returns the inserted row so callers know its new id
     suspend fun addComment(articleID: Long, text: String, parentId: String? = null) =
         withContext(Dispatchers.IO) {
             val uid = SupabaseProvider.client.auth.currentUserOrNull()?.id
                 ?: throw IllegalStateException("No authenticated user")
 
-            SupabaseProvider.client
+            val inserted = SupabaseProvider.client
                 .from("comments")
-                .insert(CommentInsert(articleID, uid, text, parentId))
+                .insert(CommentInsert(articleID, uid, text, parentId)) {
+                    select()
+                }
+                .decodeSingle<Comment>()
 
-            // if this is a reply, notify the original commenter
+            // if this is a reply, notify the original commenter and point them at this new reply
             if (parentId != null) {
                 val parentComment = SupabaseProvider.client
                     .from("comments")
@@ -81,6 +84,7 @@ class CommentRepository {
                     NotificationRepository().insertNotification(
                         targetUserId = parentAuthorId,
                         articleId = articleID,
+                        commentId = inserted.id,
                         text = "Someone replied to your comment",
                         type = "reply",
                     )

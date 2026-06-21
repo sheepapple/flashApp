@@ -33,6 +33,8 @@ data class ArticleFeedState(
     val commentCounts: Map<Long, Int> = emptyMap(),
     // Article a deep link landed on: the list auto-expands it and scrolls to the top.
     val focusedArticleId: Long? = null,
+    // Comment a deep link (a reply notification) wants to open + scroll to + highlight.
+    val focusedCommentId: String? = null,
     val error: String? = null,
 )
 
@@ -98,7 +100,7 @@ class ArticleViewModel(
      * refreshes engagement data. Dedupes on `webUrl` (the LazyColumn key) so the prepended
      * card never collides with an existing copy.
      */
-    fun prependArticleToFeed(id: Long) {
+    fun prependArticleToFeed(id: Long, commentId: String? = null) {
         viewModelScope.launch {
             val current = _state.value.articles
             val newList = current.find { it.id == id }?.let { existing ->
@@ -111,10 +113,14 @@ class ArticleViewModel(
                 } ?: return@launch
                 listOf(fetched) + current.filter { it.webUrl != fetched.webUrl }
             }
-            _state.update { it.copy(articles = newList, focusedArticleId = id) }
+            _state.update {
+                it.copy(articles = newList, focusedArticleId = id, focusedCommentId = commentId)
+            }
             loadLikes(newList)
             loadSaves()
             loadCommentCounts(newList)
+            // A reply deep link opens the comments sheet, so preload the thread it'll show.
+            if (commentId != null) refreshComments(id)
         }
     }
 

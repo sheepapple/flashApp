@@ -18,16 +18,24 @@ class NotificationRepository {
         val userId: String,
         @SerialName("articleID")
         val articleId: Long?,
+        @SerialName("commentID")
+        val commentId: String?,
         val text: String,
         val type: String,
     )
 
-    // inserts a notification
-    suspend fun insertNotification(targetUserId: String, articleId: Long?, text: String, type: String) =
+    // inserts a notification; commentId points a "reply" at the exact comment to scroll to
+    suspend fun insertNotification(
+        targetUserId: String,
+        articleId: Long?,
+        text: String,
+        type: String,
+        commentId: String? = null,
+    ) =
         withContext(Dispatchers.IO) {
             client
                 .from("notifications")
-                .insert(NotificationInsert(targetUserId, articleId, text, type))
+                .insert(NotificationInsert(targetUserId, articleId, commentId, text, type))
         }
 
     private val client get() = SupabaseProvider.client
@@ -37,7 +45,7 @@ class NotificationRepository {
         val uid = client.auth.currentUserOrNull()?.id ?: return@withContext emptyList()
         client
             .from("notifications")
-            .select(Columns.list("id", "created_at", "articleID", "userID", "text", "is_read", "type")) {
+            .select(Columns.list("id", "created_at", "articleID", "commentID", "userID", "text", "is_read", "type")) {
                 filter { eq("userID", uid) }
                 order("created_at", Order.DESCENDING)
             }

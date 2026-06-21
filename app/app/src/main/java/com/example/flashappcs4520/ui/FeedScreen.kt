@@ -2,6 +2,7 @@ package com.example.flashappcs4520.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,7 +57,6 @@ fun FeedScreen(
     avatarUrl: String? = null,
     hasUnread: Boolean = false,
     onProfileClick: () -> Unit = {},
-    onNotificationsClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
 ) {
     val state by articleViewModel.state.collectAsStateWithLifecycle()
@@ -64,7 +65,6 @@ fun FeedScreen(
         avatarUrl = avatarUrl,
         hasUnread = hasUnread,
         onProfileClick = onProfileClick,
-        onNotificationsClick = onNotificationsClick,
         onBackClick = onLogoutClick,
         onLikeToggle = { article -> article.id?.let { articleViewModel.toggleLike(it) } },
         onSaveToggle = { article -> article.id?.let { articleViewModel.toggleSave(it) } },
@@ -87,7 +87,6 @@ fun FeedContent(
     onArticleClick: (Article) -> Unit = {},
     onBackClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
-    onNotificationsClick: () -> Unit = {},
     onLikeToggle: (Article) -> Unit = {},
     onSaveToggle: (Article) -> Unit = {},
     onSendComment: (Article, String, String?) -> Unit = { _, _, _ -> },
@@ -151,41 +150,44 @@ fun FeedContent(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onProfileClick) {
+                    // Profile avatar + unread dot. NOT an IconButton: IconButton clips its
+                    // content to a circle, which would cut off a corner badge. We clip only the
+                    // avatar itself and overlay the unread dot in the (unclipped) corner so users
+                    // know to head to Profile to view Notifications.
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .size(40.dp),
+                    ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(
-                                    MaterialTheme.colorScheme.secondaryContainer,
-                                    CircleShape,
-                                ),
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.secondaryContainer)
+                                .clickable(onClick = onProfileClick),
                             contentAlignment = Alignment.Center,
                         ) {
                             // take profile url as change now
                             if (!avatarUrl.isNullOrBlank()) {
                                 AsyncImage(
                                     model = avatarUrl,
-                                    contentDescription = "Profile",
+                                    contentDescription = if (hasUnread) "Profile, unread notifications" else "Profile",
                                     contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(CircleShape),
+                                    modifier = Modifier.fillMaxSize(),
                                 )
                             } else {
                                 Icon(
                                     imageVector = Icons.Default.Person,
-                                    contentDescription = "Profile",
+                                    contentDescription = if (hasUnread) "Profile, unread notifications" else "Profile",
                                     tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                     modifier = Modifier.size(24.dp),
                                 )
                             }
                         }
+                        if (hasUnread) {
+                            Badge(modifier = Modifier.align(Alignment.TopEnd).size(10.dp))
+                        }
                     }
-                    NotificationsButton(
-                        hasUnread = hasUnread,
-                        onClick = onNotificationsClick,
-                        modifier = Modifier.padding(end = 8.dp),
-                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,

@@ -42,6 +42,9 @@ fun ArticleList(
             items = state.articles,
             key = { article -> article.webUrl },
         ) { article ->
+            val isFocused = article.id != null && article.id == state.focusedArticleId
+            // The reply deep link's target comment, only for the focused article.
+            val highlightedCommentId = if (isFocused) state.focusedCommentId else null
             ArticleCard(
                 article = article,
                 liked = article.id != null && article.id in state.likedByMe,
@@ -56,7 +59,10 @@ fun ArticleList(
                 onClick = { onArticleClick(article) },
                 onExpand = { onExpand(article) },
                 onShare = { onShare(article) },
-                initiallyExpanded = article.id != null && article.id == state.focusedArticleId,
+                initiallyExpanded = isFocused,
+                initiallyShowComments = highlightedCommentId != null,
+                highlightedCommentId = highlightedCommentId,
+                highlighted = isFocused,
             )
         }
     }

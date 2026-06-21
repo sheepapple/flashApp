@@ -64,7 +64,6 @@ class MainActivity : ComponentActivity() {
                             avatarUrl = user?.avatarUrl,
                             hasUnread = hasUnread,
                             onProfileClick = { screen = "profile" },
-                            onNotificationsClick = { screen = "notifications" },
                             // Sign out and return to the welcome (home) screen.
                             onLogoutClick = {
                                 scope.launch { auth.signOut() }
@@ -116,7 +115,7 @@ class MainActivity : ComponentActivity() {
                             onBackClick = { screen = "profile" },
                             onNotificationClick = { notification ->
                                 notification.articleId?.let { id ->
-                                    articleViewModel.prependArticleToFeed(id)
+                                    articleViewModel.prependArticleToFeed(id, notification.commentId)
                                     screen = "feed"
                                 }
                             },
