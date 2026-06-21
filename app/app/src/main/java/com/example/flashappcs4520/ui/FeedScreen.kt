@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,9 +33,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -89,12 +94,36 @@ fun FeedContent(
     onExpand: (Article) -> Unit = {},
     onShare: (Article) -> Unit = {},
 ) {
+    // Confirm before logging the user out (returns to the home/login screen).
+    var showLogoutDialog by remember { mutableStateOf(false) }
+
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Log out?") },
+            text = { Text("You will be returned to the home screen") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLogoutDialog = false
+                    onBackClick()
+                }) {
+                    Text("Log out")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 navigationIcon = {
                     IconButton(
-                        onClick = onBackClick,
+                        onClick = { showLogoutDialog = true },
                         modifier = Modifier.padding(start = 8.dp)
                     ) {
                         Icon(

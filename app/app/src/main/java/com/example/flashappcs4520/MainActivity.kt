@@ -7,15 +7,19 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.flashappcs4520.data.AuthRepository
 import com.example.flashappcs4520.ui.ArticleViewModel
 import com.example.flashappcs4520.ui.FeedScreen
 import com.example.flashappcs4520.ui.LoginScreen
 import com.example.flashappcs4520.ui.ProfileScreen
 import com.example.flashappcs4520.ui.ProfileViewModel
 import com.example.flashappcs4520.ui.SignUpScreen
+import com.example.flashappcs4520.ui.WelcomeScreen
 import com.example.flashappcs4520.ui.theme.FlashAppCS4520Theme
 import com.example.flashappcs4520.ui.SettingScreen
 import com.example.flashappcs4520.ui.SettingViewModel
@@ -28,9 +32,18 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             FlashAppCS4520Theme {
-                var screen by remember { mutableStateOf("login") }
+                val auth = remember { AuthRepository() }
+                val scope = rememberCoroutineScope()
+                var screen by remember { mutableStateOf("welcome") }
 
                 when (screen) {
+                    "welcome" -> WelcomeScreen(
+                        // Logged-in users jump straight to the feed; others create an account.
+                        onStartReading = {
+                            screen = if (auth.currentUser() != null) "feed" else "signup"
+                        },
+                        onNavigateToLogin = { screen = "login" },
+                    )
                     "login" -> LoginScreen(
                         onLoginSuccess = { screen = "feed" },
                         onNavigateToSignUp = { screen = "signup" }
@@ -47,8 +60,11 @@ class MainActivity : ComponentActivity() {
                             articleViewModel = articleViewModel,
                             avatarUrl = user?.avatarUrl,
                             onProfileClick = { screen = "profile" },
-                            // on feedScreen, exit back to login page
-                            onLogoutClick = { screen = "login" },
+                            // Sign out and return to the welcome (home) screen.
+                            onLogoutClick = {
+                                scope.launch { auth.signOut() }
+                                screen = "welcome"
+                            },
                         )
                     }
                     "profile" -> {
