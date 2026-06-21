@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,6 +66,7 @@ fun NotificationsScreen(
 ) {
     val notifications by viewModel.notifications.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val hasUnread by viewModel.hasUnread.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -87,6 +89,18 @@ fun NotificationsScreen(
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
                     )
+                },
+                actions = {
+                    // Only offered when there's something to mark; marks every unread row read in place.
+                    if (hasUnread) {
+                        IconButton(onClick = { viewModel.markAllRead() }) {
+                            Icon(
+                                imageVector = Icons.Default.DoneAll,
+                                contentDescription = "Mark all as read",
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
