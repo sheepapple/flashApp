@@ -74,6 +74,7 @@ fun FeedScreen(
         onCommentOpen = { article -> article.id?.let { articleViewModel.loadComments(it) } },
         onExpand = { article -> article.id?.let { articleViewModel.blacklistArticle(it) } },
         onShare = { article -> article.id?.let { articleViewModel.blacklistArticle(it) } },
+        onLoadMore = { articleViewModel.loadMore() },
     )
 }
 
@@ -93,6 +94,7 @@ fun FeedContent(
     onCommentOpen: (Article) -> Unit = {},
     onExpand: (Article) -> Unit = {},
     onShare: (Article) -> Unit = {},
+    onLoadMore: () -> Unit = {},
 ) {
     // Confirm before logging the user out (returns to the home/login screen).
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -234,6 +236,7 @@ fun FeedContent(
                         onCommentOpen = onCommentOpen,
                         onExpand = onExpand,
                         onShare = onShare,
+                        onLoadMore = onLoadMore,
                     )
                 }
             }

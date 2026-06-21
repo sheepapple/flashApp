@@ -1,11 +1,19 @@
 package com.example.flashappcs4520.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.flashappcs4520.common.Article
@@ -28,11 +36,27 @@ fun ArticleList(
     onCommentOpen: (Article) -> Unit = {},
     onExpand: (Article) -> Unit = {},
     onShare: (Article) -> Unit = {},
+    onLoadMore: () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     LaunchedEffect(state.focusedArticleId) {
         if (state.focusedArticleId != null) listState.animateScrollToItem(0)
     }
+
+    // Page in more once the last item scrolls into view. We read totalItemsCount from layoutInfo
+    // (always current) rather than closing over state.articles.size (would go stale). The
+    // ViewModel guards re-entry and the end-of-list case, so a few extra calls here are harmless.
+    val reachedBottom by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull()
+            last != null && last.index >= info.totalItemsCount - 1
+        }
+    }
+    LaunchedEffect(reachedBottom) {
+        if (reachedBottom && state.articles.isNotEmpty()) onLoadMore()
+    }
+
     LazyColumn(
         state = listState,
         modifier = modifier,
@@ -64,6 +88,19 @@ fun ArticleList(
                 highlightedCommentId = highlightedCommentId,
                 highlighted = isFocused,
             )
+        }
+
+        if (state.isLoadingMore) {
+            item(key = "loading-more") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
         }
     }
 }
