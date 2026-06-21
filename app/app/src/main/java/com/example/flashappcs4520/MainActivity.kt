@@ -27,6 +27,7 @@ import com.example.flashappcs4520.ui.SettingViewModel
 import com.example.flashappcs4520.ui.NotificationsScreen
 import com.example.flashappcs4520.ui.NotificationViewModel
 import com.example.flashappcs4520.ui.SavedScreen
+import com.example.flashappcs4520.ui.MyCommentsScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -138,7 +139,19 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     "saved" -> SavedScreen(onBackClick = { screen = "profile" })
-                    "comments" -> {}
+                    "comments" -> {
+                        // Same shared feed instance, so tapping one of my comments deep-links to it.
+                        val articleViewModel: ArticleViewModel = viewModel()
+                        MyCommentsScreen(
+                            onBackClick = { screen = "profile" },
+                            onCommentClick = { comment ->
+                                comment.articleId?.let { articleId ->
+                                    articleViewModel.prependArticleToFeed(articleId, comment.id)
+                                    screen = "feed"
+                                }
+                            },
+                        )
+                    }
                 }
             }
         }

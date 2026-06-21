@@ -29,6 +29,20 @@ class CommentRepository {
                 .decodeList<Comment>()
         }
 
+    /** All comments the current user has written, newest first — for the "My Comments" page. */
+    suspend fun fetchMyComments(): List<Comment> =
+        withContext(Dispatchers.IO) {
+            val uid = SupabaseProvider.client.auth.currentUserOrNull()?.id
+                ?: return@withContext emptyList()
+            SupabaseProvider.client
+                .from("comments")
+                .select(Columns.list("id", "created_at", "articleID", "userID", "text", "parentID")) {
+                    filter { eq("userID", uid) }
+                    order("created_at", Order.DESCENDING)
+                }
+                .decodeList<Comment>()
+        }
+
     /** Total comment count per article (replies included), for the feed badge. One lightweight
      *  query (just the articleID column), grouped client-side. */
     suspend fun fetchCommentCounts(articleIDs: List<Long>): Map<Long, Int> =
