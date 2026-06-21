@@ -68,6 +68,8 @@ fun FeedScreen(
             article.id?.let { articleViewModel.addComment(it, text, parentId) }
         },
         onCommentOpen = { article -> article.id?.let { articleViewModel.loadComments(it) } },
+        onExpand = { article -> article.id?.let { articleViewModel.blacklistArticle(it) } },
+        onShare = { article -> article.id?.let { articleViewModel.blacklistArticle(it) } },
     )
 }
 
@@ -84,6 +86,8 @@ fun FeedContent(
     onSaveToggle: (Article) -> Unit = {},
     onSendComment: (Article, String, String?) -> Unit = { _, _, _ -> },
     onCommentOpen: (Article) -> Unit = {},
+    onExpand: (Article) -> Unit = {},
+    onShare: (Article) -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -206,6 +210,8 @@ fun FeedContent(
                                 commentCount = article.id?.let { state.commentCounts[it] } ?: 0,
                                 onSendComment = { text, parentId -> onSendComment(article, text, parentId) },
                                 onClick = { onArticleClick(article) },
+                                onExpand = { onExpand(article) },
+                                onShare = { onShare(article) },
                             )
                         }
                     }
