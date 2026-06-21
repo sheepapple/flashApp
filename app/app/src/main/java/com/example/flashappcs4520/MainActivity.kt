@@ -11,6 +11,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.flashappcs4520.data.AuthRepository
 import com.example.flashappcs4520.ui.ArticleViewModel
@@ -37,6 +38,17 @@ class MainActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
                 var screen by remember { mutableStateOf("welcome") }
 
+                // All screens share this Activity, so viewModel() returns the same instances for
+                // the app's lifetime — they'd otherwise hold the previous user's data after a
+                // re-login. Clearing the store at the start of a session drops those stale
+                // per-user ViewModels so each session loads fresh. Called from login/signup (not
+                // logout) so it runs on a screen that has no user-scoped ViewModels in use.
+                val viewModelStoreOwner = LocalViewModelStoreOwner.current
+                fun startFreshSession() {
+                    viewModelStoreOwner?.viewModelStore?.clear()
+                    screen = "feed"
+                }
+
                 when (screen) {
                     "welcome" -> WelcomeScreen(
                         // Logged-in users jump straight to the feed; others create an account.
@@ -46,11 +58,11 @@ class MainActivity : ComponentActivity() {
                         onNavigateToLogin = { screen = "login" },
                     )
                     "login" -> LoginScreen(
-                        onLoginSuccess = { screen = "feed" },
+                        onLoginSuccess = { startFreshSession() },
                         onNavigateToSignUp = { screen = "signup" }
                     )
                     "signup" -> SignUpScreen(
-                        onSignUpSuccess = { screen = "feed" },
+                        onSignUpSuccess = { startFreshSession() },
                         onNavigateToLogin = { screen = "login" }
                     )
                     "feed" -> {
@@ -64,10 +76,13 @@ class MainActivity : ComponentActivity() {
                             avatarUrl = user?.avatarUrl,
                             hasUnread = hasUnread,
                             onProfileClick = { screen = "profile" },
-                            // Sign out and return to the welcome (home) screen.
+                            // Sign out, then return to welcome — await signOut so the cleared
+                            // session is in effect before the welcome screen checks currentUser().
                             onLogoutClick = {
-                                scope.launch { auth.signOut() }
-                                screen = "welcome"
+                                scope.launch {
+                                    auth.signOut()
+                                    screen = "welcome"
+                                }
                             },
                         )
                     }
