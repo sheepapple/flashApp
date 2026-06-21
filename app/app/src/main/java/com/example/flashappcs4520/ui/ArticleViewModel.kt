@@ -6,10 +6,12 @@ import androidx.lifecycle.viewModelScope
 import com.example.flashappcs4520.common.Article
 import com.example.flashappcs4520.data.ArticleRepository
 import com.example.flashappcs4520.data.AuthRepository
+import com.example.flashappcs4520.data.BlacklistRepository
 import com.example.flashappcs4520.data.CommentRepository
 import com.example.flashappcs4520.data.LikeRepository
 import com.example.flashappcs4520.data.SaveRepository
 import com.example.flashappcs4520.data.UserRepository
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,7 +30,6 @@ data class ArticleFeedState(
     val likedByMe: Set<Long> = emptySet(),
     val savedByMe: Set<Long> = emptySet(),
     val comments: Map<Long, List<CommentUi>> = emptyMap(),
-    /** Total comment count per article id, for the feed badge. */
     val commentCounts: Map<Long, Int> = emptyMap(),
     val error: String? = null,
 )
@@ -40,6 +41,7 @@ class ArticleViewModel(
     private val commentRepository: CommentRepository = CommentRepository(),
     private val userRepository: UserRepository = UserRepository(),
     private val authRepository: AuthRepository = AuthRepository(),
+    private val blacklistRepository: BlacklistRepository = BlacklistRepository(),
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ArticleFeedState())
@@ -53,15 +55,45 @@ class ArticleViewModel(
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
-                val articles = repository.fetchArticles()
-                _state.update { it.copy(isLoading = false, articles = articles) }
-                loadLikes(articles)
+                // fetch articles, blacklist, and user interests in parallel
+                val articlesDeferred = async { repository.fetchArticles(count = 50) }
+                val blacklistDeferred = async { blacklistRepository.fetchBlacklistedIds() }
+                val interestsDeferred = async { userRepository.fetchCurrentUser()?.interests ?: emptyList() }
+
+                val articles = articlesDeferred.await()
+                val blacklisted = blacklistDeferred.await()
+                val interests = interestsDeferred.await()
+
+                // tier 1: matches interests, not blacklisted
+                // tier 2: no interest match, not blacklisted
+                // tier 3: matches interests, blacklisted
+                // tier 4: no interest match, blacklisted
+                val tier1 = articles.filter { it.id !in blacklisted && it.section in interests }
+                val tier2 = articles.filter { it.id !in blacklisted && it.section !in interests }
+                val tier3 = articles.filter { it.id in blacklisted && it.section in interests }
+                val tier4 = articles.filter { it.id in blacklisted && it.section !in interests }
+
+                val sorted = tier1 + tier2 + tier3 + tier4
+
+                _state.update { it.copy(isLoading = false, articles = sorted) }
+                loadLikes(sorted)
                 loadSaves()
-                loadCommentCounts(articles)
+                loadCommentCounts(sorted)
             } catch (e: Exception) {
                 _state.update {
                     it.copy(isLoading = false, error = e.message ?: "Failed to load articles")
                 }
+            }
+        }
+    }
+
+    /** Adds an article to the blacklist. Called on like, save, comment, share, or expand. */
+    fun blacklistArticle(articleId: Long) {
+        viewModelScope.launch {
+            try {
+                blacklistRepository.addToBlacklist(articleId)
+            } catch (e: Exception) {
+                Log.e("Blacklist", "failed to add $articleId: ${e.message}", e)
             }
         }
     }
@@ -92,7 +124,10 @@ class ArticleViewModel(
         viewModelScope.launch {
             try {
                 if (wasLiked) likeRepository.unlikeArticle(articleId)
-                else likeRepository.likeArticle(articleId)
+                else {
+                    likeRepository.likeArticle(articleId)
+                    blacklistArticle(articleId)
+                }
             } catch (e: Exception) {
                 applyLike(articleId, liked = wasLiked)   // revert
             }
@@ -102,7 +137,7 @@ class ArticleViewModel(
     /** Sets the liked/unliked state for one article and adjusts its count accordingly. */
     private fun applyLike(articleId: Long, liked: Boolean) {
         _state.update { s ->
-            if (s.likedByMe.contains(articleId) == liked) return@update s   // no change
+            if (s.likedByMe.contains(articleId) == liked) return@update s
             val counts = s.likeCounts.toMutableMap()
             val current = counts[articleId] ?: 0
             counts[articleId] = (if (liked) current + 1 else current - 1).coerceAtLeast(0)
@@ -128,7 +163,10 @@ class ArticleViewModel(
         viewModelScope.launch {
             try {
                 if (wasSaved) saveRepository.unsaveArticle(articleId)
-                else saveRepository.saveArticle(articleId)
+                else {
+                    saveRepository.saveArticle(articleId)
+                    blacklistArticle(articleId)
+                }
             } catch (e: Exception) {
                 applySave(articleId, saved = wasSaved)   // revert
             }
@@ -138,7 +176,7 @@ class ArticleViewModel(
     /** Sets the saved/unsaved state for one article. */
     private fun applySave(articleId: Long, saved: Boolean) {
         _state.update { s ->
-            if (s.savedByMe.contains(articleId) == saved) return@update s   // no change
+            if (s.savedByMe.contains(articleId) == saved) return@update s
             val mine = s.savedByMe.toMutableSet().apply { if (saved) add(articleId) else remove(articleId) }
             s.copy(savedByMe = mine)
         }
@@ -154,6 +192,7 @@ class ArticleViewModel(
         viewModelScope.launch {
             try {
                 commentRepository.addComment(articleId, text, parentId)
+                blacklistArticle(articleId)
                 refreshComments(articleId)
             } catch (e: Exception) {
                 Log.e("Comments", "Failed to post comment on article $articleId", e)

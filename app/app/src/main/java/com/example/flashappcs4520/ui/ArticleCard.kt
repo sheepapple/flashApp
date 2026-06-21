@@ -54,6 +54,7 @@ fun ArticleCard(
     onSendComment: (text: String, parentId: String?) -> Unit = { _, _ -> },
     initiallyExpanded: Boolean = false,
     initiallyShowComments: Boolean = false,
+    onExpand: () -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(initiallyExpanded) }
     var showShareSheet by remember { mutableStateOf(false) }
@@ -62,6 +63,7 @@ fun ArticleCard(
 
     Card(
         onClick = {
+            if (!expanded) onExpand()
             expanded = !expanded
             onClick()
         },
