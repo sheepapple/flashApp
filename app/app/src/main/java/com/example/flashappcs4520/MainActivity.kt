@@ -130,6 +130,8 @@ class MainActivity : ComponentActivity() {
                         NotificationsScreen(
                             onBackClick = { screen = "profile" },
                             onNotificationClick = { notification ->
+                                // Tapping a notification clears its unread state, then follows it.
+                                notificationViewModel.markRead(notification.id)
                                 notification.articleId?.let { id ->
                                     articleViewModel.prependArticleToFeed(id, notification.commentId)
                                     screen = "feed"

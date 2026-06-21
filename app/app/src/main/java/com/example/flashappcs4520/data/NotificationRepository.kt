@@ -67,6 +67,15 @@ class NotificationRepository {
             .isNotEmpty()
     }
 
+    // mark a single notification as read (e.g. when the user taps it to follow its link)
+    suspend fun markRead(notificationId: String) = withContext(Dispatchers.IO) {
+        client
+            .from("notifications")
+            .update({ set("is_read", true) }) {
+                filter { eq("id", notificationId) }
+            }
+    }
+
     // mark all notification as read
     suspend fun markAllRead() = withContext(Dispatchers.IO) {
         val uid = client.auth.currentUserOrNull()?.id ?: return@withContext
