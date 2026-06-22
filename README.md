@@ -1,100 +1,124 @@
 # ⚡ Flash
 
-The news, in a flash. A mobile news app where users scroll a feed of summary cards ("nodes"), tap one to expand it into an AI-generated summary with images and a link to the original article, and react with likes, shares, and anonymous comments.
+The news, in a flash. A mobile news app where users scroll a feed of summary cards, tap one to expand it into an AI-generated summary with an image and a link to the original article, and react with likes, shares, and anonymous comments.
 
 ## Features
 
-- **Feed of news nodes** — scrollable cards showing title, image, and a short truncated summary
-- **Expandable story popup** — tap a node to open an AI-generated summary, images, and a link out to the original publisher
-- **Anonymous comments** — public comment thread per article
-- **Likes & shares** — react to and share stories
-- **Library** — liked and saved articles
-- **Notifications** — breaking stories, comment replies, and digests
-- **Accounts** — sign up, log in, and a personal profile (topics of interest, profile photo)
+- **Feed of news cards** — a scrollable, paged feed (loads more as you scroll) showing each story's title, image, section, and AI summary
+- **Expandable story view** — tap a card to read the full AI-generated summary and open the original Guardian article
+- **Anonymous comments** — a public comment thread per article, plus a "my comments" view
+- **Likes & shares** — like stories and share them out via the system share sheet
+- **Library** — saved articles, reachable from your profile
+- **Notifications** — in-app notifications that deep-link to the relevant article
+- **Accounts & profile** — sign up, log in, and manage a profile (username, photo, topics of interest)
+- **Topic preferences** — choose areas of interest and filter the topics you'd rather not see
 
 ## Tech stack
 
 | Layer | Choice |
 |---|---|
-| Mobile client | _(your app framework — e.g. Kotlin / Jetpack Compose)_ |
-| Backend API | _(your server — e.g. Node.js / Express)_ |
-| Database & Auth | [Supabase](https://supabase.com) — hosted PostgreSQL + built-in authentication + file storage |
+| Mobile client | Kotlin + [Jetpack Compose](https://developer.android.com/jetpack/compose) (Material 3), Supabase Kotlin SDK, Coil for images |
+| Ingestion worker | Node.js — fetches articles, summarizes, upserts to the database |
+| Backend API | Node.js / Express (minimal scaffold — see note below) |
+| Database & Auth | [Supabase](https://supabase.com) — hosted PostgreSQL + built-in authentication |
 | News data | [Guardian API](https://open-platform.theguardian.com/), cached in Postgres |
-| AI summaries | [Gemini API](https://ai.google.dev.)
-| Hosting (dev) | Render / Railway / Fly (backend + worker) |
+| AI summaries | [Gemini API](https://ai.google.dev) (`gemini-3.1-flash-lite`) |
 
 ### Why Postgres / Supabase
 
-We handle two kinds of data: **article data** (the raw article info) and **relational data** (users, comments tied to articles, likes linking users to articles, saved lists). SQL fits the relational side, and Postgres's `JSONB` column lets us dump the raw response from the undecided news API as-is and structure it later. Supabase gives us that Postgres database plus authentication in one free, integrated service — so there's no second user system to keep in sync.
+We handle two kinds of data: **article data** (the raw story plus its summary) and **relational data** (users, comments tied to articles, likes linking users to articles, saved lists). SQL fits the relational side, and Postgres's `JSONB` column lets us store the raw Guardian response as-is in `raw_data` and pull out structured columns (`web_title`, `web_url`, `image_url`, `published_at`, `section`, `summary`) for fast reads. Supabase gives us that Postgres database plus authentication in one free, integrated service — so there's no second user system to keep in sync.
 
 ## Architecture
 
 ```
                  ┌──────────────────┐
-   News API ───► │  Ingestion worker │ ──(upsert)──► ┌────────────┐
-  (scheduled)    │  (cron / poller)  │               │  Supabase  │
-                 └──────────────────┘   ┌──────────► │ (Postgres  │
-                          │             │            │  + Auth)   │
-                   Gemini API           │            └────────────┘
-                  (summaries)           │                  ▲
-                                        │                  │
-   Mobile app ──(request + token)──► Backend API ──────────┘
-                                  (reads/filters by
-                                   authenticated user)
+  Guardian API ─►│ Ingestion worker │──┐
+  (newest-first  │   (worker/)      │  │ summarize each new
+   pagination)   └──────────────────┘  │ article, then upsert
+                          │            ▼
+                     Gemini API   ┌────────────┐
+                     (summaries)  │  Supabase  │
+                                  │ (Postgres  │
+                                  │  + Auth)   │
+                                  └────────────┘
+                                        ▲
+   Android app ─────(read feed,         │
+   (Supabase Kotlin   auth, likes, ─────┘
+    SDK + anon key)   saves, comments)
 ```
 
-Key idea: the app **never** calls the news API directly. A background worker polls the news API on a schedule, generates summaries via the Gemini API, and caches everything in Postgres. Users only ever read from our own database — so API call volume is fixed by the polling schedule, not by user traffic, which keeps us under rate limits.
+Key idea: the app **never** calls the Guardian API directly. The ingestion worker polls the Guardian API, generates a summary for each new story via Gemini, and upserts everything into Postgres. Articles already in the database are skipped so re-runs don't burn the daily Gemini/Guardian quotas. Users only ever read from our own database, so external API call volume is fixed by the ingestion schedule, not by user traffic.
+
+For this build, the Android app reads Supabase **directly** through the Supabase Kotlin SDK (using the public anon key) rather than going through the Express backend. `backend/` is a minimal scaffold (a single `/feed` endpoint) that a real deployment can grow into — a server tier can slot in front of Supabase later for per-user routing without changing the UI.
 
 ## Security note
 
-The backend always derives the current user from their **Supabase auth token**, never from an ID sent by the client. Personal queries (saves, likes) are filtered by that authenticated user ID, so one user can never read another's data. Comment threads are intentionally public; like *counts* are public while *who* liked something is per-user.
+Supabase auth is used for accounts; the anon key shipped in the client is the public, row-level-security-gated key — not a secret. The **service-role key** is used only by the worker and backend (server-side) and is never shipped to the app. Comment threads are intentionally public; like *counts* are public while saves are per-user.
 
 ## Stability
 
-The app needs no device sensors — just an internet connection. Because it depends on external API calls, a **health / pulse check** monitors the API gateway and ingestion worker. The most important signal is *time since last successful fetch*; it also watches for rate-limit (`429`) and error (`5xx`) responses.
+The app needs no device sensors — just an internet connection. Because the data pipeline depends on external APIs, the worker is built defensively: it throttles to stay under the Guardian (1 call/sec, 500/day) and Gemini (15/min, 500/day) rate limits, dedupes against stories already stored, and treats a failed summary as `null` so one bad summary never breaks ingestion.
 
 ## Getting started
 
-> Prerequisites: a [Supabase](https://supabase.com) project and a Gemini API key.
+> Prerequisites: a [Supabase](https://supabase.com) project, a [Guardian API](https://open-platform.theguardian.com/access/) key, a [Gemini API](https://ai.google.dev) key, [Android Studio](https://developer.android.com/studio), and Node.js.
+
+### 1. Database
+
+Create an `articles` table in Supabase with columns: `id`, `web_title`, `web_url` (unique), `published_at`, `image_url`, `section`, `summary`, `raw_data` (JSONB) — plus tables for users, comments, likes, and saves.
+
+### 2. Worker (and backend) — Node
 
 ```bash
-# 1. Clone
-git clone <repo-url>
-cd flash
+cp .env.example .env   # then fill in the values below
 
-# 2. Configure environment
-cp .env.example .env
-# then fill in the values below
-
-# 3. Install & run (adjust to your stack)
-# backend:
+cd worker
 npm install
-npm run dev
+node index.js          # fetch from Guardian, summarize via Gemini, upsert to Supabase
+
+# optional minimal backend:
+cd ../backend
+npm install
+node index.js          # serves GET /feed on localhost:3000
 ```
 
-### Environment variables
+`.env` (used by the worker/backend — server-side only):
 
 ```
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=   # backend only — never ship to the client
-NEWS_API_KEY=
+SUPABASE_SERVICE_ROLE_KEY=   # server only — never ship to the client
+NEWS_API_KEY=                # Guardian API key
 GEMINI_API_KEY=
 ```
+
+### 3. Android app
+
+Open `app/` in Android Studio and run on an emulator or device. Supabase credentials are read from `app/local.properties` (gitignored) and exposed via `BuildConfig`:
+
+```
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+```
+
+> Note: build/run the app from **Android Studio**, not the Gradle CLI.
 
 ## Project structure
 
 ```
 flash/
-├── app/        # mobile client
-├── backend/    # API server (serves the app, talks to Supabase)
-├── worker/     # scheduled news ingestion + summary generation
+├── app/        # Android client (Kotlin + Jetpack Compose) — reads Supabase directly
+├── backend/    # Express API scaffold (single /feed endpoint)
+├── worker/     # scheduled Guardian ingestion + Gemini summary generation
 └── README.md
 ```
 
 ## Team
 
-_(team members)_
+- [Alex Mizrahi](https://github.com/sheepapple) - Ui Development, Feed screen, Social features
+
+- [Jiaen Ma](https://github.com/aXun-2) - Ui Backend and Database design, User authentication, Notification designer
+
 
 ---
 
