@@ -6,47 +6,45 @@ The news, in a flash. A mobile news app where users scroll a feed of summary car
 
 <table>
   <tr>
-    <td width="50%" align="center">
-      <img src="GithubFeedImg" width="100%" alt="Feed of news cards"/>
+    <td width="33%" align="center">
+      <img src="readmeImages/GithubStoryImg.png" width="220"/>
       <br/>
       <b>Feed of news cards</b>
       <br/>
       A scrollable, paged feed (loads more as you scroll) showing each story's title, image, section, and AI summary.
     </td>
-    <td width="50%" align="center">
-      <img src="GithubCardImg" width="100%" alt="Expandable story view"/>
+    <td width="33%" align="center">
+      <img src="readmeImages/GithubCardImg.png" width="220"/>
       <br/>
       <b>Expandable story view</b>
       <br/>
       Tap a card to read the full AI-generated summary and open the original Guardian article.
     </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center">
-      <img src="GithubCommentImg" width="100%" alt="Anonymous comments"/>
+    <td width="33%" align="center">
+      <img src="readmeImages/GithubCommentsImg.png" width="220"/>
       <br/>
       <b>Anonymous comments</b>
       <br/>
       A public comment thread per article, plus a "my comments" view.
     </td>
-    <td width="50%" align="center">
-      <img src="GithubSocialImg" width="100%" alt="Likes, shares, and library"/>
+  </tr>
+  <tr>
+    <td width="33%" align="center">
+      <img src="readmeImages/GithubSocialIMG.gif" width="220"/>
       <br/>
       <b>Likes, shares & library</b>
       <br/>
       Like stories, share them out via the system share sheet, and revisit saved articles from your profile's library.
     </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center">
-      <img src="GithubNotificationsImg" width="100%" alt="Notifications"/>
+    <td width="33%" align="center">
+      <img src="readmeImages/GithubCommentsImg2.png" width="220"/>
       <br/>
       <b>Notifications</b>
       <br/>
       In-app notifications that deep-link to the relevant article.
     </td>
-    <td width="50%" align="center">
-      <img src="GithubTopicImg" width="100%" alt="Accounts, profile, and topic preferences"/>
+    <td width="33%" align="center">
+      <img src="readmeImages/GithubProfileImg.png" width="220"/>
       <br/>
       <b>Accounts & topic preferences</b>
       <br/>
