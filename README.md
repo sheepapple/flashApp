@@ -1,5 +1,8 @@
-# ⚡ Flash
-
+<div align="center">
+  <img src="readmeImages/FlashIconApp.png" width="220"/>
+  <h1> Flash </h1>
+</div>
+ 
 The news, in a flash. A mobile news app where users scroll a feed of summary cards, tap one to expand it into an AI-generated summary with an image and a link to the original article, and react with likes, shares, and anonymous comments.
 
 ## Features
