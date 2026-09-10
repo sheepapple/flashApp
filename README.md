@@ -4,14 +4,56 @@ The news, in a flash. A mobile news app where users scroll a feed of summary car
 
 ## Features
 
-- **Feed of news cards** — a scrollable, paged feed (loads more as you scroll) showing each story's title, image, section, and AI summary
-- **Expandable story view** — tap a card to read the full AI-generated summary and open the original Guardian article
-- **Anonymous comments** — a public comment thread per article, plus a "my comments" view
-- **Likes & shares** — like stories and share them out via the system share sheet
-- **Library** — saved articles, reachable from your profile
-- **Notifications** — in-app notifications that deep-link to the relevant article
-- **Accounts & profile** — sign up, log in, and manage a profile (username, photo, topics of interest)
-- **Topic preferences** — choose areas of interest and filter the topics you'd rather not see
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="GithubFeedImg" width="100%" alt="Feed of news cards"/>
+      <br/>
+      <b>Feed of news cards</b>
+      <br/>
+      A scrollable, paged feed (loads more as you scroll) showing each story's title, image, section, and AI summary.
+    </td>
+    <td width="50%" align="center">
+      <img src="GithubCardImg" width="100%" alt="Expandable story view"/>
+      <br/>
+      <b>Expandable story view</b>
+      <br/>
+      Tap a card to read the full AI-generated summary and open the original Guardian article.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="GithubCommentImg" width="100%" alt="Anonymous comments"/>
+      <br/>
+      <b>Anonymous comments</b>
+      <br/>
+      A public comment thread per article, plus a "my comments" view.
+    </td>
+    <td width="50%" align="center">
+      <img src="GithubSocialImg" width="100%" alt="Likes, shares, and library"/>
+      <br/>
+      <b>Likes, shares & library</b>
+      <br/>
+      Like stories, share them out via the system share sheet, and revisit saved articles from your profile's library.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="GithubNotificationsImg" width="100%" alt="Notifications"/>
+      <br/>
+      <b>Notifications</b>
+      <br/>
+      In-app notifications that deep-link to the relevant article.
+    </td>
+    <td width="50%" align="center">
+      <img src="GithubTopicImg" width="100%" alt="Accounts, profile, and topic preferences"/>
+      <br/>
+      <b>Accounts & topic preferences</b>
+      <br/>
+      Sign up, log in, manage a profile (username, photo, topics of interest), and filter topics you'd rather not see.
+    </td>
+  </tr>
+</table>
 
 ## Tech stack
 
@@ -58,6 +100,12 @@ Supabase auth is used for accounts; the anon key shipped in the client is the pu
 ## Stability
 
 The app needs no device sensors — just an internet connection. Because the data pipeline depends on external APIs, the worker is built defensively: it throttles to stay under the Guardian (1 call/sec, 500/day) and Gemini (15/min, 500/day) rate limits, dedupes against stories already stored, and treats a failed summary as `null` so one bad summary never breaks ingestion.
+
+## Future goals
+
+- **More free publishers** — expand ingestion beyond the Guardian to additional free news APIs, widening topic and regional coverage without adding user-facing cost.
+- **Paid publisher integration** — let users link their own subscriptions (e.g. NYT, WSJ) so the app can pull and summarize articles from paywalled sources they already pay for, rather than being limited to freely available content.
+- **Smarter recommendations** — move beyond simple topic filtering to a more complex recommendation algorithm that factors in reading history, likes/saves, and engagement patterns to personalize the feed.
 
 ## Getting started
 
